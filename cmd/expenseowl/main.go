@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"path/filepath"
 
-	"github.com/tanq16/expenseowl/internal/api"
-	"github.com/tanq16/expenseowl/internal/config"
-	"github.com/tanq16/expenseowl/internal/storage"
-	"github.com/tanq16/expenseowl/internal/web"
+	"github.com/kwokgordon/expenseowl/internal/api"
+	"github.com/kwokgordon/expenseowl/internal/config"
+	"github.com/kwokgordon/expenseowl/internal/storage"
+	"github.com/kwokgordon/expenseowl/internal/web"
 )
 
 func runServer(dataPath string) {

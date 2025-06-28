@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tanq16/expenseowl/internal/config"
+	"github.com/kwokgordon/expenseowl/internal/config"
 )
 
 var (

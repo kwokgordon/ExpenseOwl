@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/tanq16/expenseowl/internal/config"
-	"github.com/tanq16/expenseowl/internal/storage"
-	"github.com/tanq16/expenseowl/internal/web"
+	"github.com/kwokgordon/expenseowl/internal/config"
+	"github.com/kwokgordon/expenseowl/internal/storage"
+	"github.com/kwokgordon/expenseowl/internal/web"
 )
 
 type Handler struct {

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tanq16/expenseowl/internal/config"
+	"github.com/kwokgordon/expenseowl/internal/config"
 )
 
 func (h *Handler) ExportCSV(w http.ResponseWriter, r *http.Request) {

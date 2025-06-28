@@ -41,21 +41,21 @@ var defaultCategories = []string{
 }
 
 var currencySymbols = map[string]string{
+	"cad": "C$",   // Canadian Dollar
 	"usd": "$",    // US Dollar
+	"jpy": "¥",    // Japanese Yen
+	"krw": "₩",    // Korean Won
+	"hkd": "HK$",  // Hong Kong Dollar
+	"cny": "¥",    // Chinese Yuan
 	"eur": "€",    // Euro
 	"gbp": "£",    // British Pound
-	"jpy": "¥",    // Japanese Yen
-	"cny": "¥",    // Chinese Yuan
-	"krw": "₩",    // Korean Won
 	"inr": "₹",    // Indian Rupee
 	"rub": "₽",    // Russian Ruble
 	"brl": "R$",   // Brazilian Real
 	"zar": "R",    // South African Rand
 	"aed": "AED",  // UAE Dirham
 	"aud": "A$",   // Australian Dollar
-	"cad": "C$",   // Canadian Dollar
 	"chf": "Fr",   // Swiss Franc
-	"hkd": "HK$",  // Hong Kong Dollar
 	"sgd": "S$",   // Singapore Dollar
 	"thb": "฿",    // Thai Baht
 	"try": "₺",    // Turkish Lira
@@ -108,7 +108,7 @@ func NewConfig(dataPath string) *Config {
 		StoragePath: finalPath,
 		Categories:  defaultCategories,
 		StartDate:   1,
-		Currency:    "$", // Default to USD
+		Currency:    "C$", // Default to USD
 	}
 	configPath := filepath.Join(finalPath, "config.json")
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
