@@ -40,36 +40,7 @@
             </div>
         </header>
 
-        <div class="month-navigation">
-            <button id="prevMonth" class="nav-button"><i class="fa-solid fa-arrow-left"></i></button>
-            <div class="current-month" id="currentMonth"></div>
-            <button id="nextMonth" class="nav-button"><i class="fa-solid fa-arrow-right"></i></button>
-        </div>
-
-        <div class="chart-container">
-            <div class="chart-box">
-                <canvas id="categoryPieChart"></canvas>
-            </div>
-            <div class="legend-box" id="customLegend">
-                <!-- Legend will be populated by JavaScript -->
-            </div>
-        </div>
-
-        <div id="cashflow-section" class="cashflow-container" style="display: none;">
-            <div class="cashflow-item income">
-                <div class="cashflow-label">Income</div>
-                <div class="cashflow-value" id="cashflow-income"></div>
-            </div>
-            <div class="cashflow-item expenses">
-                <div class="cashflow-label">Expenses</div>
-                <div class="cashflow-value" id="cashflow-expenses"></div>
-            </div>
-            <div class="cashflow-item balance">
-                <div class="cashflow-label">Balance</div>
-                <div class="cashflow-value" id="cashflow-balance"></div>
-            </div>
-        </div>
-
+        <!-- Input form (placed immediately below header) -->
         <div class="form-container">
             <form id="expenseForm" class="expense-form">
                 <div class="form-group">
@@ -83,12 +54,24 @@
                         <option value="">categories</option>
                     </select>
                 </div>
-                
+
                 <div class="form-group">
-                    <label for="amount">Amount</label>
-                    <input type="number" id="amount" step="0.01" min="0.01" required>
+                    <label for="currency">Currency</label>
+                    <select id="currency">
+                        <option value="">-- choose --</option>
+                    </select>
                 </div>
-                
+                <div class="form-group">
+                    <label for="currencyAmount">Currency Amount</label>
+                    <input type="number" id="currencyAmount" step="0.01" min="0">
+                </div>
+
+                <div class="form-group">
+                    <label for="amount">Amount (CAD)</label>
+                    <input type="number" id="amount" step="0.01" min="0">
+                    <div class="form-note">Automatically calculated from Currency unless you manually override</div>
+                </div>
+
                 <div class="form-group">
                     <label for="date">Date</label>
                     <input type="date" id="date" required>
@@ -108,6 +91,26 @@
             </form>
             <div id="formMessage" class="form-message"></div>
         </div>
+
+        <!-- Unified budget bars showing spent / budget per category -->
+        <div class="budget-bars-container">
+            <div id="budgetBars"></div>
+        </div>
+
+        <div id="cashflow-section" class="cashflow-container" style="display: none;">
+            <div class="cashflow-item income">
+                <div class="cashflow-label">Income</div>
+                <div class="cashflow-value" id="cashflow-income"></div>
+            </div>
+            <div class="cashflow-item expenses">
+                <div class="cashflow-label">Expenses</div>
+                <div class="cashflow-value" id="cashflow-expenses"></div>
+            </div>
+            <div class="cashflow-item balance">
+                <div class="cashflow-label">Balance</div>
+                <div class="cashflow-value" id="cashflow-balance"></div>
+            </div>
+        </div>
     </div>
     <script>
         let currencySymbol = '$'; // Default to USD
@@ -122,6 +125,57 @@
             '#FFBE0B', '#FF006E', '#8338EC', '#3A86FF', 
             '#FB5607', '#38B000', '#9B5DE5', '#F15BB5'
         ];
+        // Form behavior
+        let amountOverride = false;
+
+        function populateCurrencySelect() {
+            const sel = document.getElementById('currency');
+            sel.innerHTML = '<option value="">-- choose --</option>';
+            const codes = Object.keys(window.config.exchangeRates || {});
+            codes.forEach(code => {
+                const opt = document.createElement('option');
+                opt.value = code;
+                opt.textContent = code.toUpperCase();
+                sel.appendChild(opt);
+            });
+            const last = localStorage.getItem('lastCurrency');
+            if (last && codes.includes(last)) sel.value = last;
+            else if (codes.length > 0) sel.value = codes[0];
+        }
+
+        function maybeComputeAmount() {
+            if (amountOverride) return;
+            const code = document.getElementById('currency').value;
+            const cAmt = parseFloat(document.getElementById('currencyAmount').value) || 0;
+            if (code && cAmt > 0 && window.config.exchangeRates && window.config.exchangeRates[code]) {
+                const rate = window.config.exchangeRates[code];
+                document.getElementById('amount').value = (cAmt * rate).toFixed(2);
+            } else {
+                document.getElementById('amount').value = '';
+            }
+        }
+
+        document.addEventListener('click', () => {
+            // Global click to reset amount override if user clears amount input
+            const amt = document.getElementById('amount').value;
+            if (!amt) amountOverride = false;
+        });
+
+        // Listen for settings updates from other tabs and update dashboard live
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'budgetsUpdated' || e.key === 'exchangeRatesUpdated' || e.key === 'categoriesUpdated') {
+                fetch('/categories').then(r => r.json()).then(cfg => {
+                    window.config = cfg;
+                    // refresh category select and currency options
+                    const categorySelect = document.getElementById('category');
+                    categorySelect.innerHTML = cfg.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+                    const lastCat = localStorage.getItem('lastCategory');
+                    if (lastCat && cfg.categories.includes(lastCat)) categorySelect.value = lastCat;
+                    populateCurrencySelect();
+                    renderBudgetBars();
+                }).catch(err => console.error('Failed to auto-refresh config:', err));
+            }
+        });
         function assignCategoryColors(categories) {
             categories.forEach((category, index) => {
                 if (!categoryColors[category]) {
@@ -166,16 +220,60 @@
             return expenses.filter(exp => exp.category !== "Income").reduce((sum, exp) => sum + exp.amount, 0);
         }
 
-        function updateChartAndLegend() {
-            const monthExpenses = getMonthExpenses(allExpenses);
-            const categoryData = calculateCategoryBreakdown(monthExpenses);
-            updateCashflow(monthExpenses);
-            if (categoryData.length === 0) {
-                showNoDataMessage();
-            } else {
-                createPieChart(categoryData);
-                updateLegend(categoryData);
-            }
+        // New: render budget bars for all categories
+        function renderBudgetBars() {
+            const container = document.getElementById('budgetBars');
+            container.innerHTML = '';
+            // Sum spent amounts across all expenses
+            const totals = {};
+            allExpenses.forEach(exp => {
+                if (exp.category === 'Income') return;
+                totals[exp.category] = (totals[exp.category] || 0) + exp.amount;
+            });
+            const cfgCats = (window.config && window.config.categories) ? window.config.categories : [];
+            const budgets = (window.config && window.config.budgets) ? window.config.budgets : {};
+
+            cfgCats.forEach(category => {
+                const spent = totals[category] || 0;
+                const budget = budgets[category] || 0;
+                const left = Math.max(budget - spent, 0);
+                const over = Math.max(spent - budget, 0);
+                const spentPct = budget > 0 ? Math.min((spent / budget) * 100, 100) : (spent > 0 ? 100 : 0);
+                const overflowPct = budget > 0 && over > 0 ? Math.min((over / budget) * 100, 100) : 0;
+                const color = categoryColors[category] || '#45B7D1';
+
+                const item = document.createElement('div');
+                if (over > 0) {
+                    // fully red bar with white text inside
+                    item.className = 'budget-category budget-warning';
+                    item.innerHTML = `
+                        <div class="budget-row top-row">
+                            <div class="label">${category}</div>
+                            <div class="values">${formatCurrency(spent)} / ${formatCurrency(budget)}</div>
+                        </div>
+                        <div class="budget-row bar-row">
+                            <div class="bar-outer">
+                                <div class="bar-spent" style="width:100%; background: linear-gradient(90deg,#ff4d4d,#ff6b6b); color:#fff;">Over by: ${formatCurrency(over)}</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    item.className = 'budget-category' + (budget === 0 ? ' budget-empty' : '');
+                    item.innerHTML = `
+                        <div class="budget-row top-row">
+                            <div class="label">${category}</div>
+                            <div class="values">${formatCurrency(spent)} / ${formatCurrency(budget)}</div>
+                        </div>
+                        <div class="budget-row bar-row">
+                            <div class="bar-outer">
+                                <div class="bar-spent" style="width: ${spentPct}%; background: linear-gradient(90deg,#4EC9F1,#4ecdc4);"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+                container.appendChild(item);
+            });
+            updateCashflow(allExpenses);
         }
 
         function updateCashflow(expenses) {
@@ -305,13 +403,21 @@
                 // Fetch config response
                 const configResponse = await fetch('/categories');
                 if (!configResponse.ok) throw new Error('Failed to fetch configuration');
-                const config = await configResponse.json();
+                const cfg = await configResponse.json();
+                // store global config object for later use in rendering
+                window.config = cfg;
                 const categorySelect = document.getElementById('category');
-                categorySelect.innerHTML = config.categories.map(cat => 
+                categorySelect.innerHTML = cfg.categories.map(cat => 
                     `<option value="${cat}">${cat}</option>`
                 ).join('');
-                currencySymbol = config.currency;
-                startDate = config.startDate;
+                currencySymbol = cfg.currency;
+                startDate = cfg.startDate;
+                // Populate currencies dropdown from configured exchange rates
+                populateCurrencySelect();
+                // Attach form auto-calc listeners
+                document.getElementById('currency').addEventListener('change', () => { amountOverride = false; maybeComputeAmount(); });
+                document.getElementById('currencyAmount').addEventListener('input', () => { maybeComputeAmount(); });
+                document.getElementById('amount').addEventListener('input', () => { amountOverride = true; });
                 // Fetch expenses
                 const response = await fetch('/expenses');
                 if (!response.ok) throw new Error('Failed to fetch data');
@@ -319,8 +425,8 @@
                 // Get unique categories and assign colors
                 const uniqueCategories = [...new Set(allExpenses.map(exp => exp.category))];
                 assignCategoryColors(uniqueCategories);
-                updateMonthDisplay();
-                updateChartAndLegend();
+                // Render budget bar overview (across all data)
+                renderBudgetBars();
             } catch (error) {
                 console.error('Failed to initialize dashboard:', error);
             }
@@ -422,38 +528,20 @@
             legendContainer.innerHTML = '<div class="no-data">No expenses recorded for this month</div>';
         }
 
-        // Event Listeners
-        document.getElementById('prevMonth').addEventListener('click', () => {
-            currentDate = new Date(
-                currentDate.getFullYear(),
-                currentDate.getMonth() - 1,
-                1,
-                currentDate.getHours(),
-                currentDate.getMinutes()
-            );
-            updateMonthDisplay();
-            updateChartAndLegend();
-        });
-        document.getElementById('nextMonth').addEventListener('click', () => {
-            currentDate = new Date(
-                currentDate.getFullYear(),
-                currentDate.getMonth() + 1,
-                1,
-                currentDate.getHours(),
-                currentDate.getMinutes()
-            );
-            updateMonthDisplay();
-            updateChartAndLegend();
-        });
         document.getElementById('expenseForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = {
                 name: document.getElementById('name').value,
                 category: document.getElementById('category').value,
-                amount: parseFloat(document.getElementById('amount').value),
+                amount: parseFloat(document.getElementById('amount').value) || 0,
+                currency: document.getElementById('currency').value.trim().toLowerCase(),
+                currencyAmount: parseFloat(document.getElementById('currencyAmount').value) || 0,
                 date: getISODateWithLocalTime(document.getElementById('date').value)
             };
             try {
+                // store last used currency and category on the device
+                try { localStorage.setItem('lastCurrency', formData.currency || ''); } catch(e) {}
+                try { localStorage.setItem('lastCategory', formData.category || ''); } catch(e) {}
                 const response = await fetch('/expense', {
                     method: 'PUT',
                     headers: {
@@ -466,6 +554,8 @@
                     messageDiv.textContent = 'Expense added successfully!';
                     messageDiv.className = 'form-message success';
                     document.getElementById('expenseForm').reset();
+                    // reset override state so auto-calculation resumes
+                    amountOverride = false;
                     await initialize();
                     const today = new Date();
                     const year = today.getFullYear();

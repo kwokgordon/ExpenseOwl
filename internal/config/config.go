@@ -13,18 +13,22 @@ import (
 )
 
 type Config struct {
-	ServerPort  string
-	StoragePath string
-	Categories  []string
-	Currency    string
-	StartDate   int
-	mu          sync.RWMutex
+	ServerPort    string
+	StoragePath   string
+	Categories    []string
+	Currency      string
+	StartDate     int
+	Budgets       map[string]float64
+	ExchangeRates map[string]float64
+	mu            sync.RWMutex
 }
 
 type FileConfig struct {
-	Categories []string `json:"categories"`
-	Currency   string   `json:"currency"`
-	StartDate  int      `json:"startDate"`
+	Categories    []string           `json:"categories"`
+	Currency      string             `json:"currency"`
+	StartDate     int                `json:"startDate"`
+	Budgets       map[string]float64 `json:"budgets,omitempty"`
+	ExchangeRates map[string]float64 `json:"exchangeRates,omitempty"`
 }
 
 var defaultCategories = []string{
@@ -43,40 +47,16 @@ var defaultCategories = []string{
 var currencySymbols = map[string]string{
 	"cad": "C$",   // Canadian Dollar
 	"usd": "$",    // US Dollar
-	"jpy": "¥",    // Japanese Yen
-	"krw": "₩",    // Korean Won
-	"hkd": "HK$",  // Hong Kong Dollar
-	"cny": "¥",    // Chinese Yuan
-	"eur": "€",    // Euro
-	"gbp": "£",    // British Pound
-	"inr": "₹",    // Indian Rupee
-	"rub": "₽",    // Russian Ruble
-	"brl": "R$",   // Brazilian Real
-	"zar": "R",    // South African Rand
-	"aed": "AED",  // UAE Dirham
-	"aud": "A$",   // Australian Dollar
-	"chf": "Fr",   // Swiss Franc
-	"sgd": "S$",   // Singapore Dollar
-	"thb": "฿",    // Thai Baht
-	"try": "₺",    // Turkish Lira
-	"mxn": "Mex$", // Mexican Peso
-	"php": "₱",    // Philippine Peso
-	"pln": "zł",   // Polish Złoty
-	"sek": "kr",   // Swedish Krona
-	"nzd": "NZ$",  // New Zealand Dollar
-	"dkk": "kr.",  // Danish Krone
-	"idr": "Rp",   // Indonesian Rupiah
-	"ils": "₪",    // Israeli New Shekel
-	"vnd": "₫",    // Vietnamese Dong
-	"myr": "RM",   // Malaysian Ringgit
 }
 
 type Expense struct {
-	ID       string    `json:"id"`
-	Name     string    `json:"name"`
-	Category string    `json:"category"`
-	Amount   float64   `json:"amount"`
-	Date     time.Time `json:"date"`
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Category       string    `json:"category"`
+	Amount         float64   `json:"amount"`          // Amount in CAD (stored canonical)
+	Currency       string    `json:"currency,omitempty"`       // Currency code used when purchasing (e.g., JPY)
+	CurrencyAmount float64   `json:"currencyAmount,omitempty"` // Original amount in the transactional currency
+	Date           time.Time `json:"date"`
 }
 
 func (e *Expense) Validate() error {
@@ -104,11 +84,13 @@ func NewConfig(dataPath string) *Config {
 	}
 	log.Printf("Using data directory: %s\n", finalPath)
 	cfg := &Config{
-		ServerPort:  "8080",
-		StoragePath: finalPath,
-		Categories:  defaultCategories,
-		StartDate:   1,
-		Currency:    "C$", // Default to USD
+		ServerPort:    "8080",
+		StoragePath:   finalPath,
+		Categories:    defaultCategories,
+		StartDate:     1,
+		Currency:      "C$", // Default to CAD symbol
+		Budgets:       make(map[string]float64),
+		ExchangeRates: map[string]float64{"cad": 1.0},
 	}
 	configPath := filepath.Join(finalPath, "config.json")
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
@@ -138,8 +120,16 @@ func NewConfig(dataPath string) *Config {
 		}
 	} else if fileConfig, err := loadConfigFile(configPath); err == nil {
 		cfg.Categories = fileConfig.Categories
-		cfg.Currency = fileConfig.Currency
+		if fileConfig.Currency != "" {
+			cfg.Currency = fileConfig.Currency
+		}
 		cfg.StartDate = fileConfig.StartDate
+		if fileConfig.Budgets != nil {
+			cfg.Budgets = fileConfig.Budgets
+		}
+		if fileConfig.ExchangeRates != nil {
+			cfg.ExchangeRates = fileConfig.ExchangeRates
+		}
 		log.Println("Loaded configuration from file")
 	}
 	cfg.SaveConfig()
@@ -163,9 +153,11 @@ func (c *Config) SaveConfig() error {
 	defer c.mu.Unlock()
 	filePath := filepath.Join(c.StoragePath, "config.json")
 	fileConfig := FileConfig{
-		Categories: c.Categories,
-		Currency:   c.Currency,
-		StartDate:  c.StartDate,
+		Categories:    c.Categories,
+		Currency:      c.Currency,
+		StartDate:     c.StartDate,
+		Budgets:       c.Budgets,
+		ExchangeRates: c.ExchangeRates,
 	}
 	data, err := json.MarshalIndent(fileConfig, "", "    ")
 	if err != nil {
@@ -196,6 +188,20 @@ func (c *Config) UpdateCurrency(currencyCode string) error {
 func (c *Config) UpdateStartDate(startDate int) error {
 	c.mu.Lock()
 	c.StartDate = max(min(startDate, 31), 1)
+	c.mu.Unlock()
+	return c.SaveConfig()
+}
+
+func (c *Config) UpdateBudgets(budgets map[string]float64) error {
+	c.mu.Lock()
+	c.Budgets = budgets
+	c.mu.Unlock()
+	return c.SaveConfig()
+}
+
+func (c *Config) UpdateExchangeRates(rates map[string]float64) error {
+	c.mu.Lock()
+	c.ExchangeRates = rates
 	c.mu.Unlock()
 	return c.SaveConfig()
 }

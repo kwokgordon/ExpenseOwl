@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/fa.min.css">
     <link rel="stylesheet" href="/style.css">
+    <script src="/components/header.js" type="text/javascript" defer></script>
+
     <title>ExpenseOwl Table</title>
 </head>
 <body>
     <div class="container">
-        <header>
-            <!-- <h1 align="center"><img src="/pwa/icon-512.png" alt="ExpenseOwl Logo" height="75" style="vertical-align: middle; margin-right: 10px;">ExpenseOwl</h1> -->
             <div class="nav-bar">
                 <a href="/">
                     <img src="/pwa/icon-512.png" alt="ExpenseOwl Logo" height="85" style="vertical-align: middle; margin-right: 20px;">
@@ -25,12 +25,19 @@
                     <i class="fa-solid fa-gear"></i>
                 </a>
             </div>
-        </header>
 
-        <div class="month-navigation">
-            <button id="prevMonth" class="nav-button"><i class="fa-solid fa-arrow-left"></i></button>
-            <div class="current-month" id="currentMonth"></div>
-            <button id="nextMonth" class="nav-button"><i class="fa-solid fa-arrow-right"></i></button>
+        <div class="table-controls" style="display:flex;gap:1rem;align-items:center;margin-bottom:1rem;">
+            <label>Sort:
+                <select id="sortSelect">
+                    <option value="dateDesc">Date (newest)</option>
+                    <option value="dateAsc">Date (oldest)</option>
+                    <option value="categoryAsc">Category A-Z</option>
+                    <option value="categoryDesc">Category Z-A</option>
+                </select>
+            </label>
+            <label>Filter:
+                <select id="filterCategory"><option value="">All</option></select>
+            </label>
         </div>
 
         <div class="form-container">
@@ -48,8 +55,19 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="amount">Amount</label>
-                    <input type="number" id="amount" step="0.01" min="0.01" required>
+                    <label for="currency">Currency</label>
+                    <select id="currency">
+                        <option value="">-- choose --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="currencyAmount">Currency Amount</label>
+                    <input type="number" id="currencyAmount" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="amount">Amount (CAD)</label>
+                    <input type="number" id="amount" step="0.01" min="0">
+                    <div class="form-note">Automatically calculated from Currency unless you manually override</div>
                 </div>
                 
                 <div class="form-group">
@@ -212,10 +230,10 @@
                             <tr>
                                 <td>${expense.name}</td>
                                 <td>${expense.category}</td>
-                                <td class="amount">${formatCurrency(expense.amount)}</td>
+                                <td class="amount">${expense.currency ? (expense.currencyAmount + ' ' + expense.currency.toUpperCase() + ' / ') : ''}${formatCurrency(expense.amount)}</td>
                                 <td class="date-column">${formatDateFromUTC(expense.date)}</td>
                                 <td>
-                                    <button class="delete-button" onclick="editExpense('${expense.id}', '${expense.name}', '${expense.category}', ${expense.amount}, '${expense.date}')">
+                                    <button class="delete-button" onclick="editExpense('${expense.id}', '${expense.name}', '${expense.category}', ${expense.amount}, '${expense.date}', '${expense.currency || ''}', ${expense.currencyAmount || 0})">
                                         <i class="fa-solid fa-pen-to-square"></i>
                                     </button>
                                     <button class="delete-button" onclick="showDeleteModal('${expense.id}')">
@@ -235,10 +253,12 @@
             tableContainer.innerHTML = createTable(monthExpenses);
         }
 
-        function editExpense(id, name, category, amount, date) {
+        function editExpense(id, name, category, amount, date, currency, currencyAmount) {
             document.getElementById('name').value = name;
             document.getElementById('category').value = category;
             document.getElementById('amount').value = amount;
+            document.getElementById('currency').value = currency || '';
+            document.getElementById('currencyAmount').value = currencyAmount || '';
             const localDate = new Date(date);
             const year = localDate.getFullYear();
             const month = String(localDate.getMonth() + 1).padStart(2, '0');
@@ -260,12 +280,16 @@
                 categorySelect.innerHTML = config.categories.map(cat => 
                     `<option value="${cat}">${cat}</option>`
                 ).join('');
+                // populate filter control
+                const filterSelect = document.getElementById('filterCategory');
+                if (filterSelect) {
+                    filterSelect.innerHTML = '<option value="">All</option>' + config.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+                }
                 currencySymbol = config.currency;
                 startDate = config.startDate;
                 const response = await fetch('/expenses');
                 if (!response.ok) throw new Error('Failed to fetch data');
                 allExpenses = await response.json();
-                updateMonthDisplay();
                 updateTable();
             } catch (error) {
                 console.error('Failed to initialize table:', error);
@@ -274,27 +298,17 @@
             }
         }
 
-        document.getElementById('prevMonth').addEventListener('click', () => {
-            currentDate = new Date(
-                currentDate.getFullYear(),
-                currentDate.getMonth() - 1,
-                1,
-                currentDate.getHours(),
-                currentDate.getMinutes()
-            );
-            updateMonthDisplay();
-            updateTable();
-        });
-        document.getElementById('nextMonth').addEventListener('click', () => {
-            currentDate = new Date(
-                currentDate.getFullYear(),
-                currentDate.getMonth() + 1,
-                1,
-                currentDate.getHours(),
-                currentDate.getMinutes()
-            );
-            updateMonthDisplay();
-            updateTable();
+        // Sorting and filtering controls
+        document.getElementById('sortSelect').addEventListener('change', updateTable);
+        document.getElementById('filterCategory').addEventListener('change', updateTable);
+        // Listen for category updates from settings
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'categoriesUpdated') {
+                fetch('/categories').then(r => r.json()).then(cfg => {
+                    const filter = document.getElementById('filterCategory');
+                    filter.innerHTML = '<option value="">All</option>' + cfg.categories.map(c => `<option value="${c}">${c}</option>`).join('');
+                }).catch(err => console.error('Failed to refresh categories in table:', err));
+            }
         });
 
         let expenseToDelete = null;
@@ -340,7 +354,9 @@
             const formData = {
                 name: document.getElementById('name').value,
                 category: document.getElementById('category').value,
-                amount: parseFloat(document.getElementById('amount').value),
+                amount: parseFloat(document.getElementById('amount').value) || 0,
+                currency: document.getElementById('currency').value.trim().toLowerCase(),
+                currencyAmount: parseFloat(document.getElementById('currencyAmount').value) || 0,
                 date: getISODateWithLocalTime(document.getElementById('date').value)
             };
             try {
