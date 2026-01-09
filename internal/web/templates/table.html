@@ -26,7 +26,11 @@
                 </a>
             </div>
 
-        <div class="table-controls" style="display:flex;gap:1rem;align-items:center;margin-bottom:1rem;">
+
+
+
+        <!-- Sort & Filter controls (below form, above table) -->
+        <div class="table-controls" style="display:flex;gap:1rem;align-items:center;margin:1rem 0;">
             <label>Sort:
                 <select id="sortSelect">
                     <option value="dateDesc">Date (newest)</option>
@@ -38,56 +42,8 @@
             <label>Filter:
                 <select id="filterCategory"><option value="">All</option></select>
             </label>
-        </div>
-
-        <div class="form-container">
-            <form id="expenseForm" class="expense-form">
-                <div class="form-group">
-                    <label for="name">Name</label>
-                    <input type="text" id="name" value="-" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="category">Category</label>
-                    <select id="category" required>
-                        <option value="">categories</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="currency">Currency</label>
-                    <select id="currency">
-                        <option value="">-- choose --</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="currencyAmount">Currency Amount</label>
-                    <input type="number" id="currencyAmount" step="0.01" min="0">
-                </div>
-                <div class="form-group">
-                    <label for="amount">Amount (CAD)</label>
-                    <input type="number" id="amount" step="0.01" min="0">
-                    <div class="form-note">Automatically calculated from Currency unless you manually override</div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="date">Date</label>
-                    <input type="date" id="date" required>
-                    <script>
-                        // Set today's date as default
-                        const today = new Date();
-                        const year = today.getFullYear();
-                        const month = String(today.getMonth() + 1).padStart(2, '0'); // January is 0
-                        const day = String(today.getDate()).padStart(2, '0');
-                        const formattedDate = `${year}-${month}-${day}`;
-                        document.getElementById('date').value = formattedDate;
-                    </script>
-                </div>
-                
-                <button type="submit" class="nav-button">Add Expense</button>
-                <div id="formMessage" class="form-message"></div>
-            </form>
-            <div id="formMessage" class="form-message"></div>
+            <div style="flex:1"></div>
+            <button id="newExpense" class="nav-button">New Expense</button>
         </div>
 
         <div id="tableContainer">
@@ -106,11 +62,60 @@
         </div>
     </div>
 
+    <!-- Expense Modal (create/edit) -->
+    <div id="expenseModal" class="modal">
+        <div class="modal-content">
+            <h3 id="expenseModalTitle">Add Expense</h3>
+            <form id="expenseForm" class="expense-form">
+                <div class="form-group">
+                    <label for="date">Date</label>
+                    <input type="date" id="date" required>
+                </div>
+                <div class="form-group">
+                    <label for="name">Name</label>
+                    <input type="text" id="name" placeholder="e.g., Taxi, Dinner" required>
+                </div>
+                <div class="form-group">
+                    <label for="category">Category</label>
+                    <select id="category" required>
+                        <option value="">categories</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="currency">Currency</label>
+                    <select id="currency">
+                        <option value="">-- choose --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="currencyAmount">Currency Amount</label>
+                    <input type="number" id="currencyAmount" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="amount">Amount (CAD)</label>
+                    <input type="number" id="amount" step="0.01" min="0">
+                    <div class="form-note">Automatically calculated from Currency unless you manually override</div>
+                </div>
+                <div class="form-group">
+                    <label for="date">Date</label>
+                    <input type="date" id="date" required>
+                </div>
+                <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
+                    <button type="button" class="modal-button" onclick="closeExpenseModal()">Cancel</button>
+                    <button type="submit" class="modal-button nav-button" id="expenseSubmit">Add Expense</button>
+                </div>
+                <div id="formMessage" class="form-message"></div>
+            </form>
+        </div>
+    </div>
+
     <script>
         let currencySymbol = '$'; // Default to USD
         let currentDate = new Date();
         let allExpenses = [];
-        let startDate = 1
+        let startDate = 1;
+        // When true, user manually overrode the Amount input and auto-calculation should not overwrite it
+        let amountOverride = false;
 
         function formatCurrency(amount) {
             let formattedAmount = new Intl.NumberFormat('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(amount);
@@ -143,14 +148,10 @@
         }
         function formatDateFromUTC(utcDateString) {
             const date = new Date(utcDateString);
-            return date.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZoneName: 'short'
-            });
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
 
         function updateMonthDisplay() {
@@ -221,17 +222,19 @@
                             <th>Name</th>
                             <th>Category</th>
                             <th>Amount</th>
-                            <th class="date-header">Date</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         ${expenses.map(expense => `
                             <tr>
-                                <td>${expense.name}</td>
+                                <td>
+                                    <div><strong>${expense.name}</strong>
+                                        <div class="date-inline">${formatDateFromUTC(expense.date)}</div>
+                                    </div>
+                                </td>
                                 <td>${expense.category}</td>
                                 <td class="amount">${expense.currency ? (expense.currencyAmount + ' ' + expense.currency.toUpperCase() + ' / ') : ''}${formatCurrency(expense.amount)}</td>
-                                <td class="date-column">${formatDateFromUTC(expense.date)}</td>
                                 <td>
                                     <button class="delete-button" onclick="editExpense('${expense.id}', '${expense.name}', '${expense.category}', ${expense.amount}, '${expense.date}', '${expense.currency || ''}', ${expense.currencyAmount || 0})">
                                         <i class="fa-solid fa-pen-to-square"></i>
@@ -247,18 +250,63 @@
             `;
         }
 
+        function applyTableFilterSort(items) {
+            let results = items.slice();
+            const filter = document.getElementById('filterCategory').value;
+            if (filter) {
+                results = results.filter(exp => exp.category === filter);
+            }
+            const sorter = document.getElementById('sortSelect').value;
+            switch (sorter) {
+                case 'dateAsc':
+                    results.sort((a,b) => new Date(a.date) - new Date(b.date));
+                    break;
+                case 'dateDesc':
+                    results.sort((a,b) => new Date(b.date) - new Date(a.date));
+                    break;
+                case 'categoryAsc':
+                    results.sort((a,b) => (a.category || '').localeCompare(b.category || ''));
+                    break;
+                case 'categoryDesc':
+                    results.sort((a,b) => (b.category || '').localeCompare(a.category || ''));
+                    break;
+            }
+            return results;
+        }
+
         function updateTable() {
-            const monthExpenses = getMonthExpenses(allExpenses);
+            let monthExpenses = getMonthExpenses(allExpenses);
+            monthExpenses = applyTableFilterSort(monthExpenses);
             const tableContainer = document.getElementById('tableContainer');
             tableContainer.innerHTML = createTable(monthExpenses);
         }
 
         function editExpense(id, name, category, amount, date, currency, currencyAmount) {
+            // ensure selects are populated
+            populateCurrencySelect();
+            const categorySelect = document.getElementById('category');
+            if (window.config && window.config.categories && categorySelect) {
+                categorySelect.innerHTML = window.config.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+            }
             document.getElementById('name').value = name;
             document.getElementById('category').value = category;
-            document.getElementById('amount').value = amount;
             document.getElementById('currency').value = currency || '';
             document.getElementById('currencyAmount').value = currencyAmount || '';
+            // Determine if amount was manually overridden or matches computed value
+            const cAmt = parseFloat(currencyAmount) || 0;
+            const amt = parseFloat(amount) || 0;
+            let computed = null;
+            if (currency && cAmt > 0 && window.config && window.config.exchangeRates && window.config.exchangeRates[currency]) {
+                const rate = window.config.exchangeRates[currency];
+                computed = cAmt * rate;
+            }
+            if (computed !== null && Math.abs(amt - computed) < 0.005) {
+                amountOverride = false;
+                document.getElementById('amount').value = computed.toFixed(2);
+            } else {
+                amountOverride = true;
+                document.getElementById('amount').value = (amt).toFixed ? (amt).toFixed(2) : (parseFloat(amt)||0).toFixed(2);
+            }
             const localDate = new Date(date);
             const year = localDate.getFullYear();
             const month = String(localDate.getMonth() + 1).padStart(2, '0');
@@ -266,8 +314,11 @@
             document.getElementById('date').value = `${year}-${month}-${day}`;
             const form = document.getElementById('expenseForm');
             form.dataset.editId = id;
-            const submitButton = form.querySelector('button[type="submit"]');
+            const submitButton = document.getElementById('expenseSubmit');
             submitButton.textContent = 'Update Expense';
+            document.getElementById('expenseModalTitle').textContent = 'Edit Expense';
+            // Open modal
+            document.getElementById('expenseModal').classList.add('active');
         }
 
         async function initialize() {
@@ -287,6 +338,10 @@
                 }
                 currencySymbol = config.currency;
                 startDate = config.startDate;
+                // store global config for helper functions
+                window.config = config;
+                // populate currency select used in modal
+                populateCurrencySelect();
                 const response = await fetch('/expenses');
                 if (!response.ok) throw new Error('Failed to fetch data');
                 allExpenses = await response.json();
@@ -301,15 +356,66 @@
         // Sorting and filtering controls
         document.getElementById('sortSelect').addEventListener('change', updateTable);
         document.getElementById('filterCategory').addEventListener('change', updateTable);
+        // currency helper
+        function populateCurrencySelect() {
+            const sel = document.getElementById('currency');
+            if (!sel) return;
+            sel.innerHTML = '<option value="">-- choose --</option>';
+            const codes = Object.keys((window.config && window.config.exchangeRates) || {});
+            codes.forEach(code => {
+                const opt = document.createElement('option');
+                opt.value = code;
+                opt.textContent = code.toUpperCase();
+                sel.appendChild(opt);
+            });
+            const last = localStorage.getItem('lastCurrency');
+            if (last && codes.includes(last)) sel.value = last;
+        }
+        
         // Listen for category updates from settings
         window.addEventListener('storage', (e) => {
             if (e.key === 'categoriesUpdated') {
                 fetch('/categories').then(r => r.json()).then(cfg => {
                     const filter = document.getElementById('filterCategory');
                     filter.innerHTML = '<option value="">All</option>' + cfg.categories.map(c => `<option value="${c}">${c}</option>`).join('');
+                    // repopulate category and currency selects
+                    const categorySelect = document.getElementById('category');
+                    if (categorySelect) categorySelect.innerHTML = cfg.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+                    window.config = cfg;
+                    populateCurrencySelect();
                 }).catch(err => console.error('Failed to refresh categories in table:', err));
             }
         });
+
+        function maybeComputeAmount() {
+            if (amountOverride) return;
+            const code = document.getElementById('currency').value;
+            const cAmt = parseFloat(document.getElementById('currencyAmount').value) || 0;
+            if (code && cAmt > 0 && window.config && window.config.exchangeRates && window.config.exchangeRates[code]) {
+                const rate = window.config.exchangeRates[code];
+                document.getElementById('amount').value = (cAmt * rate).toFixed(2);
+            } else {
+                document.getElementById('amount').value = '';
+            }
+        }
+
+        // Wire up modal inputs for live calculation and manual override
+        const currencySel = document.getElementById('currency');
+        const currencyAmtInput = document.getElementById('currencyAmount');
+        const amountInput = document.getElementById('amount');
+        if (currencySel) currencySel.addEventListener('change', (e) => { amountOverride = false; maybeComputeAmount(); });
+        if (currencyAmtInput) currencyAmtInput.addEventListener('input', (e) => { amountOverride = false; maybeComputeAmount(); });
+        if (amountInput) {
+            amountInput.addEventListener('input', (e) => {
+                const v = e.target.value;
+                if (v === '' || v === null) {
+                    amountOverride = false;
+                    maybeComputeAmount();
+                } else {
+                    amountOverride = true;
+                }
+            });
+        }
 
         let expenseToDelete = null;
 
@@ -347,6 +453,45 @@
             }
         });
 
+        // Expense modal helpers
+        function showExpenseModal() {
+            const form = document.getElementById('expenseForm');
+            form.reset();
+            delete form.dataset.editId;
+            document.getElementById('expenseSubmit').textContent = 'Add Expense';
+            document.getElementById('expenseModalTitle').textContent = 'Add Expense';
+            // set date to today
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            document.getElementById('date').value = `${year}-${month}-${day}`;
+            // ensure selects are populated
+            populateCurrencySelect();
+            const categorySelect = document.getElementById('category');
+            if (window.config && window.config.categories && categorySelect) {
+                categorySelect.innerHTML = window.config.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+            }
+            amountOverride = false;
+            // compute initial amount if possible
+            maybeComputeAmount();
+            document.getElementById('expenseModal').classList.add('active');
+        }
+
+        function closeExpenseModal() {
+            document.getElementById('expenseModal').classList.remove('active');
+        }
+
+        document.getElementById('expenseModal').addEventListener('click', (e) => {
+            if (e.target.className === 'modal active') {
+                closeExpenseModal();
+            }
+        });
+
+        document.getElementById('newExpense').addEventListener('click', () => {
+            showExpenseModal();
+        });
+
         document.getElementById('expenseForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const form = e.target;
@@ -354,7 +499,7 @@
             const formData = {
                 name: document.getElementById('name').value,
                 category: document.getElementById('category').value,
-                amount: parseFloat(document.getElementById('amount').value) || 0,
+                amount: Math.round((parseFloat(document.getElementById('amount').value) || 0) * 100) / 100,
                 currency: document.getElementById('currency').value.trim().toLowerCase(),
                 currencyAmount: parseFloat(document.getElementById('currencyAmount').value) || 0,
                 date: getISODateWithLocalTime(document.getElementById('date').value)
@@ -372,15 +517,13 @@
                 if (response.ok) {
                     messageDiv.textContent = editId ? 'Expense updated successfully!' : 'Expense added successfully!';
                     messageDiv.className = 'form-message success';
+                    // persist last-used currency for next time
+                    try { localStorage.setItem('lastCurrency', formData.currency || ''); } catch (e) {}
                     form.reset();
                     delete form.dataset.editId;
-                    form.querySelector('button[type="submit"]').textContent = 'Add Expense';
+                    document.getElementById('expenseSubmit').textContent = 'Add Expense';
+                    closeExpenseModal();
                     await initialize();
-                    const today = new Date();
-                    const year = today.getFullYear();
-                    const month = String(today.getMonth() + 1).padStart(2, '0');
-                    const day = String(today.getDate()).padStart(2, '0');
-                    document.getElementById('date').value = `${year}-${month}-${day}`;
                 } else {
                     const error = await response.json();
                     messageDiv.textContent = `Error: ${error.error || 'Failed to save expense'}`;

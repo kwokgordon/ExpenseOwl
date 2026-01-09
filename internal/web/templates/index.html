@@ -44,8 +44,22 @@
         <div class="form-container">
             <form id="expenseForm" class="expense-form">
                 <div class="form-group">
+                    <label for="date">Date</label>
+                    <input type="date" id="date" required>
+                    <script>
+                        // Set today's date as default
+                        const today = new Date();
+                        const year = today.getFullYear();
+                        const month = String(today.getMonth() + 1).padStart(2, '0'); // January is 0
+                        const day = String(today.getDate()).padStart(2, '0');
+                        const formattedDate = `${year}-${month}-${day}`;
+                        document.getElementById('date').value = formattedDate;
+                    </script>
+                </div>
+
+                <div class="form-group">
                     <label for="name">Name</label>
-                    <input type="text" id="name" value="-" required>
+                    <input type="text" id="name" placeholder="e.g., Taxi, Dinner" required>
                 </div>
                 
                 <div class="form-group">
@@ -72,20 +86,6 @@
                     <div class="form-note">Automatically calculated from Currency unless you manually override</div>
                 </div>
 
-                <div class="form-group">
-                    <label for="date">Date</label>
-                    <input type="date" id="date" required>
-                    <script>
-                        // Set today's date as default
-                        const today = new Date();
-                        const year = today.getFullYear();
-                        const month = String(today.getMonth() + 1).padStart(2, '0'); // January is 0
-                        const day = String(today.getDate()).padStart(2, '0');
-                        const formattedDate = `${year}-${month}-${day}`;
-                        document.getElementById('date').value = formattedDate;
-                    </script>
-                </div>
-                
                 <button type="submit" class="nav-button">Add Expense</button>
                 <div id="formMessage" class="form-message"></div>
             </form>
@@ -220,18 +220,27 @@
             return expenses.filter(exp => exp.category !== "Income").reduce((sum, exp) => sum + exp.amount, 0);
         }
 
-        // New: render budget bars for all categories
+        // New: render budget bars for the current month and respect toggled categories
         function renderBudgetBars() {
             const container = document.getElementById('budgetBars');
             container.innerHTML = '';
-            // Sum spent amounts across all expenses
+
+            // Use only current-month expenses for the dashboard visualization
+            const monthExpenses = getMonthExpenses(allExpenses)
+                .filter(exp => exp.category !== 'Income' && !disabledCategories.has(exp.category));
+
+            // Sum spent amounts across the filtered expenses
             const totals = {};
-            allExpenses.forEach(exp => {
-                if (exp.category === 'Income') return;
+            monthExpenses.forEach(exp => {
                 totals[exp.category] = (totals[exp.category] || 0) + exp.amount;
             });
+
+            // Ensure we render one row per configured category (preserve order)
             const cfgCats = (window.config && window.config.categories) ? window.config.categories : [];
             const budgets = (window.config && window.config.budgets) ? window.config.budgets : {};
+
+            // Make sure colors are assigned for every configured category
+            assignCategoryColors(cfgCats);
 
             cfgCats.forEach(category => {
                 const spent = totals[category] || 0;
@@ -239,12 +248,11 @@
                 const left = Math.max(budget - spent, 0);
                 const over = Math.max(spent - budget, 0);
                 const spentPct = budget > 0 ? Math.min((spent / budget) * 100, 100) : (spent > 0 ? 100 : 0);
-                const overflowPct = budget > 0 && over > 0 ? Math.min((over / budget) * 100, 100) : 0;
                 const color = categoryColors[category] || '#45B7D1';
 
                 const item = document.createElement('div');
                 if (over > 0) {
-                    // fully red bar with white text inside
+                    // Fully red bar with centered white text indicating how much over the budget
                     item.className = 'budget-category budget-warning';
                     item.innerHTML = `
                         <div class="budget-row top-row">
@@ -253,7 +261,7 @@
                         </div>
                         <div class="budget-row bar-row">
                             <div class="bar-outer">
-                                <div class="bar-spent" style="width:100%; background: linear-gradient(90deg,#ff4d4d,#ff6b6b); color:#fff;">Over by: ${formatCurrency(over)}</div>
+                                <div class="bar-spent full-red" style="width:100%;">Over by: ${formatCurrency(over)}</div>
                             </div>
                         </div>
                     `;
@@ -336,16 +344,23 @@
 
         function updateLegend(categoryData) {
             const legendContainer = document.getElementById('customLegend');
+            if (!legendContainer) return; // Legend removed from layout, skip updating it
             legendContainer.innerHTML = ''; // Clear previous legend
             // Get unique categories from current month's expenses only
             const monthExpenses = getMonthExpenses(allExpenses);
             const currentMonthCategories = [...new Set(monthExpenses
                 .filter(exp => exp.category !== "Income") // Exclude Income from legend
                 .map(exp => exp.category))];
+
+            // Include configured categories so categories with no spending this month still appear
+            const cfgCats = (window.config && window.config.categories) ? window.config.categories : [];
+            const allCategories = [...new Set([...cfgCats, ...currentMonthCategories])];
+
             // Create a map of active category data for easy lookup
             const categoryMap = new Map(categoryData.map(cat => [cat.category, cat]));
+            const budgets = (window.config && window.config.budgets) ? window.config.budgets : {};
             
-            currentMonthCategories.sort((a, b) => {
+            allCategories.sort((a, b) => {
                 const dataA = categoryMap.get(a);
                 const dataB = categoryMap.get(b);
                 if (dataA && dataB) return dataB.total - dataA.total;
@@ -359,10 +374,12 @@
                 const categoryData = categoryMap.get(category);
                 const percentage = categoryData ? ` (${categoryData.percentage.toFixed(1)}%)` : '';
                 const amount = categoryData ? formatCurrency(categoryData.total) : '';
+                const hasBudget = budgets[category] && budgets[category] > 0;
+                const badgeHtml = hasBudget ? '' : `<span class="no-budget-badge">No budget set</span>`;
                 item.innerHTML = `
                     <div class="color-box" style="background-color: ${color}"></div>
                     <div class="legend-text">
-                        <span>${category}${percentage}</span>
+                        <span>${category}${percentage} ${badgeHtml}</span>
                         <span class="amount">${amount}</span>
                     </div>
                 `;
@@ -396,6 +413,26 @@
                 disabledCategories.add(category);
             }
             updateChartAndLegend();
+        }
+
+        // Update both the budget bars and the legend (and pie chart if present)
+        function updateChartAndLegend() {
+            // Use current-month data, respecting disabled categories
+            const monthExpenses = getMonthExpenses(allExpenses).filter(exp => !disabledCategories.has(exp.category));
+            const categoryData = calculateCategoryBreakdown(monthExpenses);
+
+            // Ensure colors exist for configured categories
+            const cfgCats = (window.config && window.config.categories) ? window.config.categories : [];
+            assignCategoryColors(cfgCats);
+
+            // Update legend and visualizations
+            updateLegend(categoryData);
+            // If the old pie chart is still used, keep it updated for compatibility
+            if (typeof createPieChart === 'function') {
+                createPieChart(categoryData);
+            }
+            // Render the budget bars from the current month perspective
+            renderBudgetBars();
         }
 
         async function initialize() {
@@ -525,7 +562,7 @@
             const ctx = chartCanvas.getContext('2d');
             ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
             const legendContainer = document.getElementById('customLegend');
-            legendContainer.innerHTML = '<div class="no-data">No expenses recorded for this month</div>';
+            if (legendContainer) legendContainer.innerHTML = '<div class="no-data">No expenses recorded for this month</div>';
         }
 
         document.getElementById('expenseForm').addEventListener('submit', async (e) => {

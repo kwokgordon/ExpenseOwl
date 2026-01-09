@@ -152,23 +152,33 @@
             categories.forEach((category, index) => {
                 const item = document.createElement('div');
                 item.className = 'category-item';
-                item.draggable = true;
+                item.draggable = false; // don't drag whole item; use handle or buttons
                 item.dataset.index = index;
                 item.innerHTML = `
                     <div class="category-handle-area">
-                        <span class="drag-handle"><i class="fa-solid fa-grip-lines"></i></span>
-                        <span>${category}</span>
+                        <span class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-lines"></i></span>
+                        <span class="category-name">${category}</span>
                     </div>
-                    <button class="delete-button" onclick="removeCategory(${index})">
-                        <i class="fa-solid fa-times"></i>
-                    </button>
+                    <div class="category-actions">
+                        <button class="small-button" title="Move up" onclick="moveCategoryUp(${index})"><i class="fa-solid fa-arrow-up"></i></button>
+                        <button class="small-button" title="Move down" onclick="moveCategoryDown(${index})"><i class="fa-solid fa-arrow-down"></i></button>
+                        <button class="delete-button" onclick="removeCategory(${index})"><i class="fa-solid fa-times"></i></button>
+                    </div>
                 `;
-                
-                // Add drag event listeners
-                item.addEventListener('dragstart', handleDragStart);
+
+                // Attach drag listeners to the handle for better UX
+                const handle = item.querySelector('.drag-handle');
+                if (handle) {
+                    handle.draggable = true;
+                    handle.addEventListener('dragstart', handleDragStart);
+                    // Prevent clicks on handle from triggering other controls
+                    handle.addEventListener('mousedown', (e) => e.preventDefault());
+                }
+
+                // Add drag/drop event listeners on the item as drop targets
+                item.addEventListener('dragenter', handleDragOver);
                 item.addEventListener('dragover', handleDragOver);
                 item.addEventListener('dragleave', handleDragLeave);
-                item.addEventListener('dragend', handleDragEnd);
                 item.addEventListener('drop', handleDrop);
                 
                 list.appendChild(item);
@@ -177,31 +187,38 @@
 
         // Drag and drop handlers
         function handleDragStart(e) {
-            this.classList.add('dragging');
-            draggedItem = this;
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/html', this.innerHTML);
+            // Support drag started on either the handle or the whole item
+            const itemEl = this.classList && this.classList.contains('category-item') ? this : (this.closest ? this.closest('.category-item') : null);
+            if (!itemEl) return;
+            itemEl.classList.add('dragging');
+            draggedItem = itemEl;
+            try {
+                e.dataTransfer.effectAllowed = 'move';
+                // Some browsers require data to be set
+                e.dataTransfer.setData('text/plain', itemEl.dataset.index || '');
+            } catch (err) {
+                // ignore for browsers that don't allow setData in certain contexts
+            }
             removePlaceholders();
+            console.debug('dragstart', itemEl.dataset.index);
         }
 
         function handleDragOver(e) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            this.classList.add('drag-over');
-            if (this === draggedItem) return false;
-            // Determine it should go before or after this item
-            const rect = this.getBoundingClientRect();
-            const clientY = e.clientY;
-            const threshold = rect.top + (rect.height / 2);
-            const isBefore = clientY < threshold;
+            try { e.dataTransfer.dropEffect = 'move'; } catch (err) {}
+            const targetItem = e.target.closest ? e.target.closest('.category-item') : null;
+            if (!targetItem || !draggedItem || targetItem === draggedItem) return false;
+            targetItem.classList.add('drag-over');
+            const rect = targetItem.getBoundingClientRect();
+            const clientY = e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY) || 0;
+            const isBefore = clientY < (rect.top + (rect.height / 2));
             removePlaceholders();
-            // Add a placeholder before or after this item
             const placeholder = document.createElement('div');
             placeholder.className = 'placeholder';
             if (isBefore) {
-                this.parentNode.insertBefore(placeholder, this);
+                targetItem.parentNode.insertBefore(placeholder, targetItem);
             } else {
-                this.parentNode.insertBefore(placeholder, this.nextSibling);
+                targetItem.parentNode.insertBefore(placeholder, targetItem.nextSibling);
             }
             return false;
         }
@@ -211,11 +228,14 @@
         }
 
         function handleDragEnd(e) {
-            this.classList.remove('dragging');
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging');
+            }
             document.querySelectorAll('.category-item').forEach(item => {
                 item.classList.remove('drag-over');
             });
             removePlaceholders();
+            draggedItem = null;
         }
         
         function removePlaceholders() {
@@ -227,32 +247,24 @@
         function handleDrop(e) {
             e.stopPropagation();
             e.preventDefault();
-            removePlaceholders();
-            // Don't do anything if dropping on the same item
-            if (draggedItem !== this) {
-                const rect = this.getBoundingClientRect();
-                const clientY = e.clientY;
-                const threshold = rect.top + (rect.height / 2);
-                const isBefore = clientY < threshold;
-                
-                const fromIndex = parseInt(draggedItem.dataset.index);
-                let toIndex = parseInt(this.dataset.index);
-                
-                if (!isBefore && fromIndex < toIndex) {
-                    toIndex = toIndex; // Insert after
-                } else if (isBefore && fromIndex > toIndex) {
-                    toIndex = toIndex; // Insert before
-                } else if (isBefore && fromIndex < toIndex) {
-                    toIndex = toIndex - 1; // Adjust for removal of dragged item
-                } else if (!isBefore && fromIndex > toIndex) {
-                    toIndex = toIndex + 1; // Insert after, adjust for position
-                }
-                
-                const movedItem = categories[fromIndex];
-                categories.splice(fromIndex, 1);
-                categories.splice(toIndex, 0, movedItem);
-                renderCategories();
+            const list = document.getElementById('categories-list');
+            const placeholderEl = list.querySelector('.placeholder');
+            if (!placeholderEl || !draggedItem) {
+                removePlaceholders();
+                return false;
             }
+            const children = Array.from(list.children);
+            let toIndex = 0;
+            for (let i = 0; i < children.length; i++) {
+                if (children[i] === placeholderEl) break;
+                if (children[i].classList && children[i].classList.contains('category-item')) toIndex++;
+            }
+            const fromIndex = parseInt(draggedItem.dataset.index);
+            const movedItem = categories.splice(fromIndex, 1)[0];
+            categories.splice(toIndex, 0, movedItem);
+            draggedItem = null;
+            removePlaceholders();
+            renderCategories();
             return false;
         }
 
@@ -273,6 +285,19 @@
             showDeleteCategoryModal(category);
         }
 
+        function moveCategoryUp(index) {
+            if (index <= 0) return;
+            const item = categories.splice(index, 1)[0];
+            categories.splice(index - 1, 0, item);
+            renderCategories();
+        }
+
+        function moveCategoryDown(index) {
+            if (index >= categories.length - 1) return;
+            const item = categories.splice(index, 1)[0];
+            categories.splice(index + 1, 0, item);
+            renderCategories();
+        }
         function showDeleteCategoryModal(oldCategory) {
             document.getElementById('oldCategoryName').textContent = oldCategory;
             const select = document.getElementById('reassignSelect');
@@ -333,6 +358,18 @@
                 if (response.ok) {
                     showMessage('categoriesMessage', 'Categories saved successfully', true);
                     try { localStorage.setItem('categoriesUpdated', Date.now().toString()); } catch (e) {}
+                    // Re-fetch canonical categories from server and re-render to ensure order persisted
+                    try {
+                        const cfgRes = await fetch('/categories');
+                        if (cfgRes.ok) {
+                            const cfg = await cfgRes.json();
+                            categories = cfg.categories || categories;
+                            renderCategories();
+                            try { renderBudgets(); } catch(e) {}
+                        }
+                    } catch (err) {
+                        console.warn('Failed to refresh categories after save:', err);
+                    }
                 } else {
                     showMessage('categoriesMessage', 'Failed to save categories', false);
                 }
