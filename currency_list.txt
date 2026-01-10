@@ -1,0 +1,61 @@
+config.go
+
+	"cad": "C$",   // Canadian Dollar
+	"usd": "$",    // US Dollar
+	"jpy": "¥",    // Japanese Yen
+	"krw": "₩",    // Korean Won
+	"hkd": "HK$",  // Hong Kong Dollar
+	"cny": "¥",    // Chinese Yuan
+	"eur": "€",    // Euro
+	"gbp": "£",    // British Pound
+	"inr": "₹",    // Indian Rupee
+	"rub": "₽",    // Russian Ruble
+	"brl": "R$",   // Brazilian Real
+	"zar": "R",    // South African Rand
+	"aed": "AED",  // UAE Dirham
+	"aud": "A$",   // Australian Dollar
+	"chf": "Fr",   // Swiss Franc
+	"sgd": "S$",   // Singapore Dollar
+	"thb": "฿",    // Thai Baht
+	"try": "₺",    // Turkish Lira
+	"mxn": "Mex$", // Mexican Peso
+	"php": "₱",    // Philippine Peso
+	"pln": "zł",   // Polish Złoty
+	"sek": "kr",   // Swedish Krona
+	"nzd": "NZ$",  // New Zealand Dollar
+	"dkk": "kr.",  // Danish Krone
+	"idr": "Rp",   // Indonesian Rupiah
+	"ils": "₪",    // Israeli New Shekel
+	"vnd": "₫",    // Vietnamese Dong
+	"myr": "RM",   // Malaysian Ringgit
+
+
+settings.html
+            "cad": "C$",   // Canadian Dollar
+            "usd": "$",    // US Dollar
+            "jpy": "¥",    // Japanese Yen
+            "krw": "₩",    // Korean Won
+            "hkd": "HK$",  // Hong Kong Dollar
+            "cny": "¥",    // Chinese Yuan
+            "eur": "€",    // Euro
+            "gbp": "£",    // British Pound
+            "inr": "₹",    // Indian Rupee
+            "rub": "₽",    // Russian Ruble
+            "brl": "R$",   // Brazilian Real
+            "zar": "R",    // South African Rand
+            "aed": "AED",  // UAE Dirham
+            "aud": "A$",   // Australian Dollar
+            "chf": "Fr",   // Swiss Franc
+            "sgd": "S$",   // Singapore Dollar
+            "thb": "฿",    // Thai Baht
+            "try": "₺",    // Turkish Lira
+            "mxn": "Mex$", // Mexican Peso
+            "php": "₱",    // Philippine Peso
+            "pln": "zł",   // Polish Złoty
+            "sek": "kr",   // Swedish Krona
+            "nzd": "NZ$",  // New Zealand Dollar
+            "dkk": "kr.",  // Danish Krone
+            "idr": "Rp",   // Indonesian Rupiah
+            "ils": "₪",    // Israeli New Shekel
+            "vnd": "₫",    // Vietnamese Dong
+            "myr": "RM",   // Malaysian Ringgit
