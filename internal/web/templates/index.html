@@ -256,7 +256,7 @@
                     item.className = 'budget-category budget-warning';
                     item.innerHTML = `
                         <div class="budget-row top-row">
-                            <div class="label">${category}</div>
+                            <div class="label"><a class="budget-link" href="/table?category=${encodeURIComponent(category)}" onclick="try{localStorage.setItem('lastCategory','${category}')}catch(e){}">${category}</a></div>
                             <div class="values">${formatCurrency(spent)} / ${formatCurrency(budget)}</div>
                         </div>
                         <div class="budget-row bar-row">
@@ -269,7 +269,7 @@
                     item.className = 'budget-category' + (budget === 0 ? ' budget-empty' : '');
                     item.innerHTML = `
                         <div class="budget-row top-row">
-                            <div class="label">${category}</div>
+                            <div class="label"><a class="budget-link" href="/table?category=${encodeURIComponent(category)}" onclick="try{localStorage.setItem('lastCategory','${category}')}catch(e){}">${category}</a></div>
                             <div class="values">${formatCurrency(spent)} / ${formatCurrency(budget)}</div>
                         </div>
                         <div class="budget-row bar-row">

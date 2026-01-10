@@ -335,6 +335,16 @@
                 const filterSelect = document.getElementById('filterCategory');
                 if (filterSelect) {
                     filterSelect.innerHTML = '<option value="">All</option>' + config.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+                    // If a category is specified in URL params, pre-select it
+                    const params = new URLSearchParams(window.location.search);
+                    const catParam = params.get('category');
+                    if (catParam) {
+                        const options = Array.from(filterSelect.options).map(o => o.value);
+                        if (options.includes(catParam)) {
+                            filterSelect.value = catParam;
+                            try { localStorage.setItem('lastCategory', catParam); } catch(e) {}
+                        }
+                    }
                 }
                 currencySymbol = config.currency;
                 startDate = config.startDate;

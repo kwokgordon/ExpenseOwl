@@ -123,6 +123,14 @@ header {
 .budget-row .label {
     font-weight: 600;
 }
+.budget-link {
+    color: inherit;
+    text-decoration: none;
+    font-weight: 700;
+}
+.budget-link:hover {
+    text-decoration: underline;
+}
 
 .budget-row .values {
     font-family: monospace;
