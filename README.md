@@ -35,7 +35,7 @@ That's why I created this project and I use it in my home lab for my expense tra
 - REST API for expense management
 - Single-user focused (mainly for a home lab deployment)
 - CSV and JSON export and import of all expense data from the UI
-- Custom categories, currency symbol, and start date via app settings
+- Custom categories, currency symbol, start date via app settings, and per-category budgeting with exchange rate support for travel expenses
 - Beautiful interface that automatically adapts to system for light/dark theme
 - UUID-based expense identification in the backend
 - Self-contained binary and container image to ensure no internet interaction
@@ -57,6 +57,13 @@ That's why I created this project and I use it in my home lab for my expense tra
 4. Month-by-month navigation in both dashboard and table views
 5. Settings page for configuring the application
     - Reorder, add, or remove custom categories
+- Set per-category budgets and add exchange rates (settings page) so foreign-currency expenses are converted to CAD for reporting
+
+Budgeting and travel support:
+- Open the Settings page and add per-category budgets in the "Budget Settings" section.
+- Add or edit exchange rates (to CAD) in the "Exchange Rates" section — use lowercase currency codes (e.g., jpy) and provide their rate to CAD.
+- When adding an expense you can either enter the CAD amount directly or enter the foreign `Currency` (code) and `Currency Amount`; the app will convert it to CAD using the configured exchange rate.
+
     - Select a custom currency to display
     - Select a custom start date to show expenses for a different period
     - Exporting data as CSV or JSON and import data from JSON or CSV

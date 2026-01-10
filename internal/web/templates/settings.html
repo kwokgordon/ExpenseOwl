@@ -40,6 +40,19 @@
                 </div>
                 <button id="saveCategories" class="nav-button">Save Categories</button>
                 <div id="categoriesMessage" class="form-message"></div>
+
+                <!-- Delete / Reassign Modal -->
+                <div id="deleteCategoryModal" class="modal">
+                    <div class="modal-content">
+                        <h3>Reassign Category</h3>
+                        <p>Choose a category to move all transactions from <strong id="oldCategoryName"></strong> to:</p>
+                        <select id="reassignSelect"></select>
+                        <div style="margin-top:1rem; display:flex; gap:1rem; justify-content:flex-end;">
+                            <button class="modal-button" onclick="closeDeleteCategoryModal()">Cancel</button>
+                            <button class="modal-button confirm" id="confirmReassign">Reassign & Delete</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -56,15 +69,32 @@
                 <div id="currencyMessage" class="form-message"></div>
             </div>
             
-            <!-- Start date section -->
-            <div class="form-container half-width">
-                <h2 align="center">Start Date Settings</h2>
-                <div class="start-date-manager">
-                    <input type="number" id="startDate" min="1" max="31" placeholder="1">
-                    <button id="saveStartDate" class="nav-button">Save</button>
-                </div>
-                <div id="startDateMessage" class="form-message"></div>
+
+        </div>
+
+        <!-- Budget Settings -->
+        <div class="form-container">
+            <h2 align="center">Budget Settings</h2>
+            <div id="budget-list" class="budget-list">
+                <!-- Budget inputs populated here -->
             </div>
+            <button id="saveBudgets" class="nav-button">Save Budgets</button>
+            <div id="budgetsMessage" class="form-message"></div>
+        </div>
+
+        <!-- Exchange Rate Settings -->
+        <div class="form-container">
+            <h2 align="center">Exchange Rates (to CAD)</h2>
+            <div id="exchange-rates-list" class="exchange-list">
+                <!-- Rates will be populated here -->
+            </div>
+            <div class="add-exchange">
+                <input type="text" id="newExchangeCode" placeholder="Currency code (e.g., jpy)">
+                <input type="number" id="newExchangeRate" placeholder="Rate to CAD" step="0.0001">
+                <button id="addExchange" class="nav-button">Add</button>
+            </div>
+            <button id="saveExchangeRates" class="nav-button">Save Rates</button>
+            <div id="exchangeMessage" class="form-message"></div>
         </div>
 
         <!-- Import/Export Section -->
@@ -93,39 +123,15 @@
 
     <script>
         const currencySymbols = {
-            "usd": "$",    // US Dollar
-            "eur": "€",    // Euro
-            "gbp": "£",    // British Pound
-            "jpy": "¥",    // Japanese Yen
-            "cny": "¥",    // Chinese Yuan
-            "krw": "₩",    // Korean Won
-            "inr": "₹",    // Indian Rupee
-            "rub": "₽",    // Russian Ruble
-            "brl": "R$",   // Brazilian Real
-            "zar": "R",    // South African Rand
-            "aed": "AED",  // UAE Dirham
-            "aud": "A$",   // Australian Dollar
             "cad": "C$",   // Canadian Dollar
-            "chf": "Fr",   // Swiss Franc
-            "hkd": "HK$",  // Hong Kong Dollar
-            "sgd": "S$",   // Singapore Dollar
-            "thb": "฿",    // Thai Baht
-            "try": "₺",    // Turkish Lira
-            "mxn": "Mex$", // Mexican Peso
-            "php": "₱",    // Philippine Peso
-            "pln": "zł",   // Polish Złoty
-            "sek": "kr",   // Swedish Krona
-            "nzd": "NZ$",  // New Zealand Dollar
-            "dkk": "kr.",  // Danish Krone
-            "idr": "Rp",   // Indonesian Rupiah
-            "ils": "₪",    // Israeli New Shekel
-            "vnd": "₫",    // Vietnamese Dong
-            "myr": "RM",   // Malaysian Ringgit
+            "usd": "$",    // US Dollar
         };
 
         let categories = [];
         let currentCurrency = "";
         let currentStartDate = 1;
+        let budgets = {};
+        let exchangeRates = {};
         let draggedItem = null;
 
         // Functions to show message
@@ -146,23 +152,33 @@
             categories.forEach((category, index) => {
                 const item = document.createElement('div');
                 item.className = 'category-item';
-                item.draggable = true;
+                item.draggable = false; // don't drag whole item; use handle or buttons
                 item.dataset.index = index;
                 item.innerHTML = `
                     <div class="category-handle-area">
-                        <span class="drag-handle"><i class="fa-solid fa-grip-lines"></i></span>
-                        <span>${category}</span>
+                        <span class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-lines"></i></span>
+                        <span class="category-name">${category}</span>
                     </div>
-                    <button class="delete-button" onclick="removeCategory(${index})">
-                        <i class="fa-solid fa-times"></i>
-                    </button>
+                    <div class="category-actions">
+                        <button class="small-button" title="Move up" onclick="moveCategoryUp(${index})"><i class="fa-solid fa-arrow-up"></i></button>
+                        <button class="small-button" title="Move down" onclick="moveCategoryDown(${index})"><i class="fa-solid fa-arrow-down"></i></button>
+                        <button class="delete-button" onclick="removeCategory(${index})"><i class="fa-solid fa-times"></i></button>
+                    </div>
                 `;
-                
-                // Add drag event listeners
-                item.addEventListener('dragstart', handleDragStart);
+
+                // Attach drag listeners to the handle for better UX
+                const handle = item.querySelector('.drag-handle');
+                if (handle) {
+                    handle.draggable = true;
+                    handle.addEventListener('dragstart', handleDragStart);
+                    // Prevent clicks on handle from triggering other controls
+                    handle.addEventListener('mousedown', (e) => e.preventDefault());
+                }
+
+                // Add drag/drop event listeners on the item as drop targets
+                item.addEventListener('dragenter', handleDragOver);
                 item.addEventListener('dragover', handleDragOver);
                 item.addEventListener('dragleave', handleDragLeave);
-                item.addEventListener('dragend', handleDragEnd);
                 item.addEventListener('drop', handleDrop);
                 
                 list.appendChild(item);
@@ -171,31 +187,38 @@
 
         // Drag and drop handlers
         function handleDragStart(e) {
-            this.classList.add('dragging');
-            draggedItem = this;
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/html', this.innerHTML);
+            // Support drag started on either the handle or the whole item
+            const itemEl = this.classList && this.classList.contains('category-item') ? this : (this.closest ? this.closest('.category-item') : null);
+            if (!itemEl) return;
+            itemEl.classList.add('dragging');
+            draggedItem = itemEl;
+            try {
+                e.dataTransfer.effectAllowed = 'move';
+                // Some browsers require data to be set
+                e.dataTransfer.setData('text/plain', itemEl.dataset.index || '');
+            } catch (err) {
+                // ignore for browsers that don't allow setData in certain contexts
+            }
             removePlaceholders();
+            console.debug('dragstart', itemEl.dataset.index);
         }
 
         function handleDragOver(e) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            this.classList.add('drag-over');
-            if (this === draggedItem) return false;
-            // Determine it should go before or after this item
-            const rect = this.getBoundingClientRect();
-            const clientY = e.clientY;
-            const threshold = rect.top + (rect.height / 2);
-            const isBefore = clientY < threshold;
+            try { e.dataTransfer.dropEffect = 'move'; } catch (err) {}
+            const targetItem = e.target.closest ? e.target.closest('.category-item') : null;
+            if (!targetItem || !draggedItem || targetItem === draggedItem) return false;
+            targetItem.classList.add('drag-over');
+            const rect = targetItem.getBoundingClientRect();
+            const clientY = e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY) || 0;
+            const isBefore = clientY < (rect.top + (rect.height / 2));
             removePlaceholders();
-            // Add a placeholder before or after this item
             const placeholder = document.createElement('div');
             placeholder.className = 'placeholder';
             if (isBefore) {
-                this.parentNode.insertBefore(placeholder, this);
+                targetItem.parentNode.insertBefore(placeholder, targetItem);
             } else {
-                this.parentNode.insertBefore(placeholder, this.nextSibling);
+                targetItem.parentNode.insertBefore(placeholder, targetItem.nextSibling);
             }
             return false;
         }
@@ -205,11 +228,14 @@
         }
 
         function handleDragEnd(e) {
-            this.classList.remove('dragging');
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging');
+            }
             document.querySelectorAll('.category-item').forEach(item => {
                 item.classList.remove('drag-over');
             });
             removePlaceholders();
+            draggedItem = null;
         }
         
         function removePlaceholders() {
@@ -221,32 +247,24 @@
         function handleDrop(e) {
             e.stopPropagation();
             e.preventDefault();
-            removePlaceholders();
-            // Don't do anything if dropping on the same item
-            if (draggedItem !== this) {
-                const rect = this.getBoundingClientRect();
-                const clientY = e.clientY;
-                const threshold = rect.top + (rect.height / 2);
-                const isBefore = clientY < threshold;
-                
-                const fromIndex = parseInt(draggedItem.dataset.index);
-                let toIndex = parseInt(this.dataset.index);
-                
-                if (!isBefore && fromIndex < toIndex) {
-                    toIndex = toIndex; // Insert after
-                } else if (isBefore && fromIndex > toIndex) {
-                    toIndex = toIndex; // Insert before
-                } else if (isBefore && fromIndex < toIndex) {
-                    toIndex = toIndex - 1; // Adjust for removal of dragged item
-                } else if (!isBefore && fromIndex > toIndex) {
-                    toIndex = toIndex + 1; // Insert after, adjust for position
-                }
-                
-                const movedItem = categories[fromIndex];
-                categories.splice(fromIndex, 1);
-                categories.splice(toIndex, 0, movedItem);
-                renderCategories();
+            const list = document.getElementById('categories-list');
+            const placeholderEl = list.querySelector('.placeholder');
+            if (!placeholderEl || !draggedItem) {
+                removePlaceholders();
+                return false;
             }
+            const children = Array.from(list.children);
+            let toIndex = 0;
+            for (let i = 0; i < children.length; i++) {
+                if (children[i] === placeholderEl) break;
+                if (children[i].classList && children[i].classList.contains('category-item')) toIndex++;
+            }
+            const fromIndex = parseInt(draggedItem.dataset.index);
+            const movedItem = categories.splice(fromIndex, 1)[0];
+            categories.splice(toIndex, 0, movedItem);
+            draggedItem = null;
+            removePlaceholders();
+            renderCategories();
             return false;
         }
 
@@ -263,8 +281,65 @@
         }
 
         function removeCategory(index) {
-            categories.splice(index, 1);
+            const category = categories[index];
+            showDeleteCategoryModal(category);
+        }
+
+        function moveCategoryUp(index) {
+            if (index <= 0) return;
+            const item = categories.splice(index, 1)[0];
+            categories.splice(index - 1, 0, item);
             renderCategories();
+        }
+
+        function moveCategoryDown(index) {
+            if (index >= categories.length - 1) return;
+            const item = categories.splice(index, 1)[0];
+            categories.splice(index + 1, 0, item);
+            renderCategories();
+        }
+        function showDeleteCategoryModal(oldCategory) {
+            document.getElementById('oldCategoryName').textContent = oldCategory;
+            const select = document.getElementById('reassignSelect');
+            select.innerHTML = '';
+            categories.filter(c => c !== oldCategory).forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                select.appendChild(opt);
+            });
+            document.getElementById('deleteCategoryModal').classList.add('active');
+            document.getElementById('confirmReassign').onclick = async () => {
+                const newCat = select.value;
+                if (!newCat) {
+                    showMessage('categoriesMessage', 'Please select a category to reassign to', false);
+                    return;
+                }
+                try {
+                    const res = await fetch('/categories/delete', {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({old: oldCategory, new: newCat})
+                    });
+                    if (res.ok) {
+                        showMessage('categoriesMessage', 'Category reassigned and deleted', true);
+                        // Refresh categories UI
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 600);
+                        try { localStorage.setItem('categoriesUpdated', Date.now().toString()); } catch (e) {}
+                    } else {
+                        showMessage('categoriesMessage', 'Failed to reassign category', false);
+                    }
+                } catch (err) {
+                    console.error('Error reassigning category:', err);
+                    showMessage('categoriesMessage', 'Error reassigning category', false);
+                }
+            };
+        }
+
+        function closeDeleteCategoryModal() {
+            document.getElementById('deleteCategoryModal').classList.remove('active');
         }
 
         async function saveCategories() {
@@ -282,6 +357,19 @@
                 });   
                 if (response.ok) {
                     showMessage('categoriesMessage', 'Categories saved successfully', true);
+                    try { localStorage.setItem('categoriesUpdated', Date.now().toString()); } catch (e) {}
+                    // Re-fetch canonical categories from server and re-render to ensure order persisted
+                    try {
+                        const cfgRes = await fetch('/categories');
+                        if (cfgRes.ok) {
+                            const cfg = await cfgRes.json();
+                            categories = cfg.categories || categories;
+                            renderCategories();
+                            try { renderBudgets(); } catch(e) {}
+                        }
+                    } catch (err) {
+                        console.warn('Failed to refresh categories after save:', err);
+                    }
                 } else {
                     showMessage('categoriesMessage', 'Failed to save categories', false);
                 }
@@ -328,34 +416,45 @@
             }
         }
 
-        // Start date functions
-        function populateStartDateInput() {
-            const input = document.getElementById("startDate");
-            input.value = currentStartDate;
-        }
 
-        async function saveStartDate() {
-            const startDate = document.getElementById("startDate").value;
-            try {
-                const response = await fetch('/startdate', {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: startDate
-                });
-                if (response.ok) {
-                    showMessage('startDateMessage', 'Start date saved successfully', true);
-                } else {
-                    showMessage('startDateMessage', 'Failed to save start date', false);
-                }
-            } catch (error) {
-                console.error('Error saving start date:', error);
-                showMessage('startDateMessage', 'Error saving start date', false);
-            }
-        }
 
         // Initialize the page
+        function renderBudgets() {
+            const container = document.getElementById('budget-list');
+            container.innerHTML = '';
+            categories.forEach(cat => {
+                const value = budgets[cat] || 0;
+                const item = document.createElement('div');
+                item.className = 'budget-item';
+                item.innerHTML = `
+                    <label>${cat}</label>
+                    <input type="number" data-category="${cat}" value="${value}" step="0.01" min="0">
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function renderExchangeRates() {
+            const container = document.getElementById('exchange-rates-list');
+            container.innerHTML = '';
+            Object.keys(exchangeRates).sort().forEach(code => {
+                const value = exchangeRates[code];
+                const item = document.createElement('div');
+                item.className = 'exchange-item';
+                item.innerHTML = `
+                    <label>${code.toUpperCase()}</label>
+                    <input type="number" data-code="${code}" value="${value}" step="0.0001" min="0">
+                    <button class="delete-button" data-code="${code}"><i class="fa-solid fa-times"></i></button>
+                `;
+                container.appendChild(item);
+                item.querySelector('.delete-button').addEventListener('click', (e) => {
+                    const codeToDel = e.target.closest('button').dataset.code;
+                    delete exchangeRates[codeToDel];
+                    renderExchangeRates();
+                });
+            });
+        }
+
         async function initialize() {
             try {
                 const response = await fetch('/categories');
@@ -366,6 +465,8 @@
                 categories = [...config.categories];
                 currentCurrency = config.currency;
                 currentStartDate = config.startDate;
+                budgets = config.budgets || {};
+                exchangeRates = config.exchangeRates || {};
                 let currentCurrencyCode = "usd"; // Default
                 for (const [code, symbol] of Object.entries(currencySymbols)) {
                     if (symbol === currentCurrency) {
@@ -375,7 +476,8 @@
                 }
                 renderCategories();
                 populateCurrencySelect();
-                populateStartDateInput();
+                renderBudgets();
+                renderExchangeRates();
             } catch (error) {
                 console.error('Failed to initialize settings:', error);
                 showMessage('categoriesMessage', 'Failed to load settings', false);
@@ -445,7 +547,62 @@
         document.getElementById('addCategory').addEventListener('click', addCategory);
         document.getElementById('saveCategories').addEventListener('click', saveCategories);
         document.getElementById('saveCurrency').addEventListener('click', saveCurrency);
-        document.getElementById('saveStartDate').addEventListener('click', saveStartDate);
+
+        document.getElementById('saveBudgets').addEventListener('click', async () => {
+            // Collect budget map
+            const inputs = document.querySelectorAll('#budget-list input[data-category]');
+            const payload = {};
+            inputs.forEach(inp => {
+                const cat = inp.dataset.category;
+                const val = parseFloat(inp.value) || 0;
+                payload[cat] = val;
+            });
+            try {
+                const res = await fetch('/budgets/edit', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    showMessage('budgetsMessage', 'Budgets saved successfully', true);
+                    try { localStorage.setItem('budgetsUpdated', Date.now().toString()); } catch (e) {}
+                } else {
+                    showMessage('budgetsMessage', 'Failed to save budgets', false);
+                }
+            } catch (err) {
+                console.error('Error saving budgets:', err);
+                showMessage('budgetsMessage', 'Error saving budgets', false);
+            }
+        });
+        document.getElementById('addExchange').addEventListener('click', () => {
+            const code = document.getElementById('newExchangeCode').value.trim().toLowerCase();
+            const rate = parseFloat(document.getElementById('newExchangeRate').value);
+            if (!code || isNaN(rate) || rate <= 0) {
+                showMessage('exchangeMessage', 'Invalid code or rate', false);
+                return;
+            }
+            exchangeRates[code] = rate;
+            document.getElementById('newExchangeCode').value = '';
+            document.getElementById('newExchangeRate').value = '';
+            renderExchangeRates();
+        });
+        document.getElementById('saveExchangeRates').addEventListener('click', async () => {
+            try {
+                const res = await fetch('/exchangerates/edit', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(exchangeRates)
+                });
+                if (res.ok) {
+                    showMessage('exchangeMessage', 'Exchange rates saved successfully', true);
+                } else {
+                    showMessage('exchangeMessage', 'Failed to save exchange rates', false);
+                }
+            } catch (err) {
+                console.error('Error saving exchange rates:', err);
+                showMessage('exchangeMessage', 'Error saving exchange rates', false);
+            }
+        });
         document.getElementById('csvFile').addEventListener('change', handleFileUpload);
         document.getElementById('jsonFile').addEventListener('change', handleFileUpload);
         document.getElementById('newCategory').addEventListener('keypress', (e) => {

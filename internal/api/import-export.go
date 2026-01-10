@@ -29,13 +29,15 @@ func (h *Handler) ExportCSV(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment; filename=expenses.csv")
-	// write CSV data
-	w.Write([]byte("ID,Name,Category,Amount,Date\n"))
+	// write CSV data (CurrencyAmount, Currency, CAD Amount)
+	w.Write([]byte("ID,Name,Category,CurrencyAmount,Currency,CADAmount,Date\n"))
 	for _, expense := range expenses {
-		line := fmt.Sprintf("%s,%s,%s,%.2f,%s\n",
+		line := fmt.Sprintf("%s,%s,%s,%.2f,%s,%.2f,%s\n",
 			expense.ID,
 			strings.ReplaceAll(expense.Name, ",", ";"), // Replace , in name with ;
 			expense.Category,
+			expense.CurrencyAmount,
+			expense.Currency,
 			expense.Amount,
 			expense.Date.Format("2006-01-02 15:04:05"),
 		)
@@ -103,8 +105,9 @@ func (h *Handler) ImportCSV(w http.ResponseWriter, r *http.Request) {
 	}
 	stringEscape := regexp.MustCompile(`[^a-zA-Z0-9_ \.]*`)
 	header := records[0]
-	// Find the indices of required columns
+	// Find the indices of required columns (support optional Currency and CurrencyAmount)
 	var nameIdx, categoryIdx, amountIdx, dateIdx int = -1, -1, -1, -1
+	var currencyAmountIdx, currencyIdx int = -1, -1
 	for i, col := range header {
 		colLower := strings.ToLower(strings.TrimSpace(stringEscape.ReplaceAllString(col, "")))
 		switch colLower {
@@ -116,6 +119,10 @@ func (h *Handler) ImportCSV(w http.ResponseWriter, r *http.Request) {
 			amountIdx = i
 		case "date":
 			dateIdx = i
+		case "currencyamount", "currency_amount", "currency amount":
+			currencyAmountIdx = i
+		case "currency":
+			currencyIdx = i
 		}
 	}
 	if nameIdx == -1 || categoryIdx == -1 || amountIdx == -1 || dateIdx == -1 {
@@ -167,6 +174,28 @@ func (h *Handler) ImportCSV(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Warning: Skipping row %d due to invalid amount: %s\n", i, record[amountIdx])
 			continue
 		}
+		// Optional currency and currency amount
+		currency := ""
+		currencyAmount := 0.0
+		if currencyIdx != -1 {
+			currency = strings.TrimSpace(record[currencyIdx])
+		}
+		if currencyAmountIdx != -1 {
+			if v := strings.TrimSpace(record[currencyAmountIdx]); v != "" {
+				if ca, err := strconv.ParseFloat(v, 64); err == nil {
+					currencyAmount = ca
+				}
+			}
+		}
+		// Determine CAD amount using currency info if provided
+		cadAmount := amount
+		if currency != "" && currencyAmount > 0 {
+			if rate, ok := h.config.ExchangeRates[strings.ToLower(currency)]; ok {
+				cadAmount = currencyAmount * rate
+			} else {
+				log.Printf("Warning: Missing exchange rate for %s; using provided amount as CAD for row %d\n", currency, i)
+			}
+		}
 		// Handle date (skipping regex since parsing as time)
 		dateStr := strings.TrimSpace(record[dateIdx])
 		var date time.Time
@@ -198,11 +227,13 @@ func (h *Handler) ImportCSV(w http.ResponseWriter, r *http.Request) {
 		}
 		// Save the expense
 		expense := &config.Expense{
-			ID:       "", // Ensure new ID value
-			Name:     name,
-			Category: category,
-			Amount:   amount,
-			Date:     date,
+			ID:             "", // Ensure new ID value
+			Name:           name,
+			Category:       category,
+			Amount:         cadAmount,
+			Currency:       currency,
+			CurrencyAmount: currencyAmount,
+			Date:           date,
 		}
 
 		if err := h.storage.SaveExpense(expense); err != nil {
@@ -288,9 +319,19 @@ func (h *Handler) ImportJSON(w http.ResponseWriter, r *http.Request) {
 		} else {
 			expense.Category = strings.TrimSpace(stringEscape.ReplaceAllString(expense.Category, ""))
 		}
+		// If Amount missing, try to compute from currency fields
 		if expense.Amount <= 0 {
-			log.Printf("Warning: Skipping expense %d due to bad amount: %f\n", i+1, expense.Amount)
-			continue
+			if expense.Currency != "" && expense.CurrencyAmount > 0 {
+				if rate, ok := h.config.ExchangeRates[strings.ToLower(expense.Currency)]; ok {
+					expense.Amount = expense.CurrencyAmount * rate
+				} else {
+					log.Printf("Warning: Skipping expense %d due to missing exchange rate for %s\n", i+1, expense.Currency)
+					continue
+				}
+			} else {
+				log.Printf("Warning: Skipping expense %d due to bad amount: %f\n", i+1, expense.Amount)
+				continue
+			}
 		}
 		if expense.Date.IsZero() {
 			log.Printf("Warning: Skipping expense %d due to missing date\n", i+1)

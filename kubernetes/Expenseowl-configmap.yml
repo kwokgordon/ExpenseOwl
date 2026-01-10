@@ -4,5 +4,5 @@ metadata:
   name: expenseowl-config
   namespace: expenseowl
 data:
-  EXPENSE_CATEGORIES: "Food,Groceries,Travel,Rent,Utilities,Money Transfer,Entertainment,Healthcare,Shopping,Other"
-  CURRENCY: jpy
+  EXPENSE_CATEGORIES: "Hotel,Air Fare,Food,Transportation,Miscellaneous"
+  CURRENCY: CAD

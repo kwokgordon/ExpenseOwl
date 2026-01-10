@@ -93,27 +93,164 @@ header {
     text-align: center;
 }
 
-.chart-container {
-    display: flex;
-    gap: 1rem;
+/* Budget bars container replaces pie chart with clear budget vs spent bars */
+
+.budget-bars-container {
     margin-bottom: 1rem;
     background-color: var(--bg-secondary);
     border-radius: 8px;
-    padding: 0.5rem;
-    min-height: 450px;
-    align-items: center;
+    padding: 0.75rem;
 }
 
-.chart-box {
-    flex: 1;
-    height: 380px;
+.budget-category {
+    padding: 0.5rem 0.5rem 0.75rem 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    display: flex;
+    flex-direction: column;
+}
+
+.budget-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.budget-row.top-row {
+    margin-bottom: 0.5rem;
+}
+
+.budget-row .label {
+    font-weight: 600;
+}
+.budget-link {
+    color: inherit;
+    text-decoration: none;
+    font-weight: 700;
+}
+.budget-link:hover {
+    text-decoration: underline;
+}
+
+.budget-row .values {
+    font-family: monospace;
+    color: var(--text-secondary);
+}
+
+.bar-outer {
+    width: 100%;
+    background: rgba(255,255,255,0.04); /* gray background for leftover */
+    height: 20px;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+.bar-spent {
+    height: 100%;
+    background: linear-gradient(90deg,#4EC9F1,#4ecdc4); /* light blue gradient */
+    transition: width 0.5s ease;
+    color: #fff;
     display: flex;
     align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
-.chart-box canvas {
-    width: 100%;
-    max-height: 380px;
+.bar-leftover {
+    height: 100%;
+    background: rgba(255,255,255,0.06);
+}
+
+.bar-overflow {
+    position: absolute;
+    right: -1px;
+    top: 0;
+    height: 100%;
+    background: linear-gradient(90deg,#ff6b6b,#ff8b8b);
+    border-radius: 0 6px 6px 0;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.2);
+}
+
+.budget-warning {
+    border-left: 4px solid #ff6b6b;
+    padding-left: 0.5rem;
+    background-color: rgba(255,107,107,0.02);
+}
+
+/* Emphasize over-budget bars */
+.budget-warning .bar-outer {
+    background: rgba(255,107,107,0.03);
+}
+.budget-warning .bar-spent.full-red {
+    width: 100% !important;
+    background: linear-gradient(90deg,#ff4d4d,#ff6b6b);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    border-radius: 6px;
+}
+
+.budget-empty {
+    opacity: 0.6;
+}
+
+.budget-overflow-label {
+    color: #ff6b6b;
+    font-size: 0.85rem;
+    margin-left: 0.5rem;
+    font-weight: 600;
+}
+
+/* No budget indicator styles */
+.no-budget-badge {
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    margin-left: 0.5rem;
+    font-weight: 700;
+    background: rgba(255,215,0,0.08);
+    padding: 0.15rem 0.4rem;
+    border-radius: 6px;
+    border: 1px solid rgba(255,215,0,0.12);
+}
+
+.no-budget-indicator {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    border-top: 1px dashed rgba(255,255,255,0.06);
+}
+
+/* Small marker for tiny spends */
+.bar-spent[style*="min-width"] {
+    display: inline-block;
+    padding-left: 4px;
+    padding-right: 4px;
+    border-radius: 4px;
+}
+
+/* Input form placed above the graph */
+.form-container {
+    background-color: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 700px) {
+    .budget-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .budget-row .values {
+        margin-top: 0.25rem;
+    }
 }
 
 .legend-item {
@@ -353,37 +490,78 @@ header {
 
 .categories-list {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 0.5rem;
     margin-bottom: 1rem;
 }
 
 .category-item {
     cursor: grab;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    width: 100%;
+    box-sizing: border-box;
+    background-color: var(--bg-primary);
+    border: 1px solid transparent;
 }
 .category-item.dragging {
-    opacity: 0.5;
+    opacity: 0.6;
     cursor: grabbing;
 }
 .category-item.drag-over {
     border: 1px dashed var(--accent);
-    background-color: rgba(105, 175, 222, 0.1);
+    background-color: rgba(105, 175, 222, 0.06);
 }
 .category-item .drag-handle {
     cursor: grab;
-    margin-right: 6px;
+    margin-right: 8px;
     color: var(--text-secondary);
+    padding: 0.25rem;
+    border-radius: 4px;
 }
 .category-handle-area {
     display: flex;
     align-items: center;
+    gap: 0.5rem;
+    flex: 1 1 auto;
+}
+.category-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.small-button {
+    padding: 0.35rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+.small-button:hover {
+    border-color: var(--accent);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 }
 .placeholder {
     border: 2px dashed var(--accent);
-    background-color: rgba(105, 175, 222, 0.1);
+    background-color: rgba(105, 175, 222, 0.06);
     margin: 0.25rem 0;
-    height: 2px;
-    border-radius: 9999px;
+    height: 44px;
+    border-radius: 6px;
+}
+
+@media (max-width: 480px) {
+    .category-item {
+        padding: 0.5rem;
+        flex-direction: row;
+    }
+    .category-handle-area {
+        flex: 1 1 auto;
+    }
+}
 }
 
 .category-item {
@@ -606,6 +784,12 @@ header {
         padding: 0.75rem;
     }
 
+    .date-inline {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-top: 0.25rem;
+    }
+
     .container {
         padding: 1rem;
     }
@@ -679,6 +863,73 @@ header {
 .form-group select:focus {
     outline: none;
     border-color: var(--accent);
+}
+
+/* Make settings inputs match dashboard form inputs */
+.form-container input,
+.form-container select,
+.budget-list input,
+.exchange-list input,
+.category-input-container input,
+.add-exchange input {
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.form-container input:focus,
+.form-container select:focus,
+.budget-list input:focus,
+.exchange-list input:focus,
+.category-input-container input:focus,
+.add-exchange input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* Layout tweaks for budget and exchange lines */
+.budget-list .budget-item {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap; /* allow items to wrap on small screens */
+}
+.budget-item label {
+    min-width: 0;
+    flex: 0 0 140px; /* fixed label column that can shrink on small screens */
+    color: var(--text-secondary);
+}
+.budget-item input {
+    flex: 1 1 120px;
+    min-width: 0;
+}
+
+@media (max-width: 480px) {
+    .budget-item label {
+        flex-basis: 100%;
+    }
+    .budget-item input {
+        flex-basis: 100%;
+    }
+}
+
+.exchange-list .exchange-item {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.exchange-item label {
+    min-width: 100px;
+    color: var(--text-secondary);
+}
+
+.category-input-container input {
+    flex: 1 1 auto;
 }
 
 .form-message {

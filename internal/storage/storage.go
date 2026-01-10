@@ -24,6 +24,7 @@ type Storage interface {
 	GetAllExpenses() ([]*config.Expense, error)
 	DeleteExpense(id string) error
 	EditExpense(expense *config.Expense) error
+	ReassignCategory(oldCategory, newCategory string) error
 }
 
 type jsonStore struct {
@@ -99,6 +100,16 @@ func (s *jsonStore) DeleteExpense(id string) error {
 	return s.writeFile(data)
 }
 
+func (s *jsonStore) GetAllExpenses() ([]*config.Expense, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	data, err := s.readFile()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read storage file: %v", err)
+	}
+	return data.Expenses, nil
+}
+
 func (s *jsonStore) EditExpense(expense *config.Expense) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -122,15 +133,20 @@ func (s *jsonStore) EditExpense(expense *config.Expense) error {
 	return s.writeFile(data)
 }
 
-func (s *jsonStore) GetAllExpenses() ([]*config.Expense, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	data, err := s.readFile()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read storage file: %v", err)
-	}
-	log.Println("Retrieved all expenses")
-	return data.Expenses, nil
+func (s *jsonStore) ReassignCategory(oldCategory, newCategory string) error {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+    data, err := s.readFile()
+    if err != nil {
+        return fmt.Errorf("failed to read storage file: %v", err)
+    }
+    for _, exp := range data.Expenses {
+        if exp.Category == oldCategory {
+            exp.Category = newCategory
+        }
+    }
+    log.Printf("Reassigned expenses from category %s to %s\n", oldCategory, newCategory)
+    return s.writeFile(data)
 }
 
 func (s *jsonStore) readFile() (*fileData, error) {
@@ -141,6 +157,9 @@ func (s *jsonStore) readFile() (*fileData, error) {
 	var data fileData
 	if err := json.Unmarshal(content, &data); err != nil {
 		return nil, err
+	}
+	if data.Expenses == nil {
+		data.Expenses = []*config.Expense{}
 	}
 	return &data, nil
 }

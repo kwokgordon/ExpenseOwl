@@ -24,6 +24,9 @@ func runServer(dataPath string) {
 	http.HandleFunc("/categories/edit", handler.EditCategories)
 	http.HandleFunc("/currency", handler.EditCurrency)
 	http.HandleFunc("/startdate", handler.EditStartDate)
+	http.HandleFunc("/budgets/edit", handler.EditBudgets)
+	http.HandleFunc("/exchangerates/edit", handler.EditExchangeRates)
+	http.HandleFunc("/categories/delete", handler.ReassignCategory)
 	http.HandleFunc("/expense", handler.AddExpense)
 	http.HandleFunc("/expenses", handler.GetExpenses)
 	http.HandleFunc("/expense/edit", handler.EditExpense)
@@ -42,6 +45,7 @@ func runServer(dataPath string) {
 	http.HandleFunc("/chart.min.js", handler.ServeStaticFile)
 	http.HandleFunc("/fa.min.css", handler.ServeStaticFile)
 	http.HandleFunc("/webfonts/", handler.ServeStaticFile)
+	http.HandleFunc("/components/", handler.ServeStaticFile)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
