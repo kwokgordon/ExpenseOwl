@@ -1,3 +1,5 @@
+import { APP_VERSION } from './version.js';
+
 class Header extends HTMLElement {
   constructor() {
     super();
@@ -6,7 +8,6 @@ class Header extends HTMLElement {
   connectedCallback() {
     this.innerHTML = `
         <header>
-            <!-- <h1 align="center"><img src="../pwa/icon-512.png" alt="ExpenseOwl Logo" height="75" style="vertical-align: middle; margin-right: 10px;">ExpenseOwl</h1> -->
             <div class="nav-bar">
                 <a href="/">
                     <img src="/pwa/icon-512.png" alt="ExpenseOwl Logo" height="85" style="vertical-align: middle; margin-right: 20px;">
@@ -20,6 +21,7 @@ class Header extends HTMLElement {
                 <a href="/settings" class="view-button" data-tooltip="Settings">
                     <i class="fa-solid fa-gear"></i>
                 </a>
+                <span style="margin-left:auto;font-size:0.95em;color:#888;align-self:center;padding-left:1.5rem;">v${APP_VERSION}</span>
             </div>
         </header>
     `;
