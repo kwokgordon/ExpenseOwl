@@ -242,6 +242,42 @@
             // Make sure colors are assigned for every configured category
             assignCategoryColors(cfgCats);
 
+            // --- TOTAL BAR ---
+            const totalSpent = cfgCats.reduce((sum, cat) => sum + (totals[cat] || 0), 0);
+            const totalBudget = cfgCats.reduce((sum, cat) => sum + (budgets[cat] || 0), 0);
+            const totalOver = Math.max(totalSpent - totalBudget, 0);
+            const totalSpentPct = totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : (totalSpent > 0 ? 100 : 0);
+            const totalBar = document.createElement('div');
+            if (totalOver > 0) {
+                totalBar.className = 'budget-category budget-warning';
+                totalBar.innerHTML = `
+                    <div class="budget-row top-row">
+                        <div class="label">Total</div>
+                        <div class="values">${formatCurrency(totalSpent)} / ${formatCurrency(totalBudget)}</div>
+                    </div>
+                    <div class="budget-row bar-row">
+                        <div class="bar-outer">
+                            <div class="bar-spent full-red" style="width:100%;">Over by: ${formatCurrency(totalOver)}</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                totalBar.className = 'budget-category' + (totalBudget === 0 ? ' budget-empty' : '');
+                totalBar.innerHTML = `
+                    <div class="budget-row top-row">
+                        <div class="label">Total</div>
+                        <div class="values">${formatCurrency(totalSpent)} / ${formatCurrency(totalBudget)}</div>
+                    </div>
+                    <div class="budget-row bar-row">
+                        <div class="bar-outer">
+                            <div class="bar-spent" style="width: ${totalSpentPct}%; background: linear-gradient(90deg,#4EC9F1,#4ecdc4);"></div>
+                        </div>
+                    </div>
+                `;
+            }
+            container.appendChild(totalBar);
+
+            // --- CATEGORY BARS ---
             cfgCats.forEach(category => {
                 const spent = totals[category] || 0;
                 const budget = budgets[category] || 0;
