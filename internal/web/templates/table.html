@@ -96,10 +96,6 @@
                     <input type="number" id="amount" step="0.01" min="0">
                     <div class="form-note">Automatically calculated from Currency unless you manually override</div>
                 </div>
-                <div class="form-group">
-                    <label for="date">Date</label>
-                    <input type="date" id="date" required>
-                </div>
                 <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
                     <button type="button" class="modal-button" onclick="closeExpenseModal()">Cancel</button>
                     <button type="submit" class="modal-button nav-button" id="expenseSubmit">Add Expense</button>
@@ -287,6 +283,13 @@
             const categorySelect = document.getElementById('category');
             if (window.config && window.config.categories && categorySelect) {
                 categorySelect.innerHTML = window.config.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+                // Set to last used category if available
+                const lastCat = localStorage.getItem('lastCategory');
+                if (lastCat && window.config.categories.includes(lastCat)) {
+                    categorySelect.value = lastCat;
+                } else if (window.config.categories.length > 0) {
+                    categorySelect.value = window.config.categories[0];
+                }
             }
             document.getElementById('name').value = name;
             document.getElementById('category').value = category;
@@ -331,6 +334,13 @@
                 categorySelect.innerHTML = config.categories.map(cat => 
                     `<option value="${cat}">${cat}</option>`
                 ).join('');
+                // Set to last used category if available
+                const lastCat = localStorage.getItem('lastCategory');
+                if (lastCat && config.categories.includes(lastCat)) {
+                    categorySelect.value = lastCat;
+                } else if (config.categories.length > 0) {
+                    categorySelect.value = config.categories[0];
+                }
                 // populate filter control
                 const filterSelect = document.getElementById('filterCategory');
                 if (filterSelect) {
@@ -481,6 +491,13 @@
             const categorySelect = document.getElementById('category');
             if (window.config && window.config.categories && categorySelect) {
                 categorySelect.innerHTML = window.config.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+                // Set to last used category if available
+                const lastCat = localStorage.getItem('lastCategory');
+                if (lastCat && window.config.categories.includes(lastCat)) {
+                    categorySelect.value = lastCat;
+                } else if (window.config.categories.length > 0) {
+                    categorySelect.value = window.config.categories[0];
+                }
             }
             amountOverride = false;
             // compute initial amount if possible
