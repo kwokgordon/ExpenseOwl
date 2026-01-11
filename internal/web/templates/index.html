@@ -10,6 +10,7 @@
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/pwa/icon-192.png">
     <link rel="stylesheet" href="/style.css">
+    <script type="module" src="/components/version.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -19,26 +20,11 @@
     </script>
     <title>ExpenseOwl Dashboard</title>
     <script src="/chart.min.js"></script>
+    <script type="module" src="/components/header.js"></script>
 </head>
 <body>
     <div class="container">
-        <header>
-            <!-- <h1 align="center"><img src="/pwa/icon-512.png" alt="ExpenseOwl Logo" height="75" style="vertical-align: middle; margin-right: 10px;">ExpenseOwl</h1> -->
-            <div class="nav-bar">
-                <a href="/">
-                    <img src="/pwa/icon-512.png" alt="ExpenseOwl Logo" height="85" style="vertical-align: middle; margin-right: 20px;">
-                </a>
-                <a href="/" class="view-button active" data-tooltip="Dashboard">
-                    <i class="fa-solid fa-chart-pie"></i>
-                </a>
-                <a href="/table" class="view-button" data-tooltip="Table View">
-                    <i class="fa-solid fa-table"></i>
-                </a>
-                <a href="/settings" class="view-button" data-tooltip="Settings">
-                    <i class="fa-solid fa-gear"></i>
-                </a>
-            </div>
-        </header>
+        <header-component></header-component>
 
         <!-- Input form (placed immediately below header) -->
         <div class="form-container">
@@ -169,8 +155,13 @@
                     // refresh category select and currency options
                     const categorySelect = document.getElementById('category');
                     categorySelect.innerHTML = cfg.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+                    // Set to last used category if available
                     const lastCat = localStorage.getItem('lastCategory');
-                    if (lastCat && cfg.categories.includes(lastCat)) categorySelect.value = lastCat;
+                    if (lastCat && cfg.categories.includes(lastCat)) {
+                        categorySelect.value = lastCat;
+                    } else if (cfg.categories.length > 0) {
+                        categorySelect.value = cfg.categories[0];
+                    }
                     populateCurrencySelect();
                     renderBudgetBars();
                 }).catch(err => console.error('Failed to auto-refresh config:', err));
@@ -242,6 +233,42 @@
             // Make sure colors are assigned for every configured category
             assignCategoryColors(cfgCats);
 
+            // --- TOTAL BAR ---
+            const totalSpent = cfgCats.reduce((sum, cat) => sum + (totals[cat] || 0), 0);
+            const totalBudget = cfgCats.reduce((sum, cat) => sum + (budgets[cat] || 0), 0);
+            const totalOver = Math.max(totalSpent - totalBudget, 0);
+            const totalSpentPct = totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : (totalSpent > 0 ? 100 : 0);
+            const totalBar = document.createElement('div');
+            if (totalOver > 0) {
+                totalBar.className = 'budget-category budget-warning';
+                totalBar.innerHTML = `
+                    <div class="budget-row top-row">
+                        <div class="label">Total</div>
+                        <div class="values">${formatCurrency(totalSpent)} / ${formatCurrency(totalBudget)}</div>
+                    </div>
+                    <div class="budget-row bar-row">
+                        <div class="bar-outer">
+                            <div class="bar-spent full-red" style="width:100%;">Over by: ${formatCurrency(totalOver)}</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                totalBar.className = 'budget-category' + (totalBudget === 0 ? ' budget-empty' : '');
+                totalBar.innerHTML = `
+                    <div class="budget-row top-row">
+                        <div class="label">Total</div>
+                        <div class="values">${formatCurrency(totalSpent)} / ${formatCurrency(totalBudget)}</div>
+                    </div>
+                    <div class="budget-row bar-row">
+                        <div class="bar-outer">
+                            <div class="bar-spent" style="width: ${totalSpentPct}%; background: linear-gradient(90deg,#4EC9F1,#4ecdc4);"></div>
+                        </div>
+                    </div>
+                `;
+            }
+            container.appendChild(totalBar);
+
+            // --- CATEGORY BARS ---
             cfgCats.forEach(category => {
                 const spent = totals[category] || 0;
                 const budget = budgets[category] || 0;
@@ -447,6 +474,13 @@
                 categorySelect.innerHTML = cfg.categories.map(cat => 
                     `<option value="${cat}">${cat}</option>`
                 ).join('');
+                // Set to last used category if available
+                const lastCat = localStorage.getItem('lastCategory');
+                if (lastCat && cfg.categories.includes(lastCat)) {
+                    categorySelect.value = lastCat;
+                } else if (cfg.categories.length > 0) {
+                    categorySelect.value = cfg.categories[0];
+                }
                 currencySymbol = cfg.currency;
                 startDate = cfg.startDate;
                 // Populate currencies dropdown from configured exchange rates

@@ -32,16 +32,14 @@ type FileConfig struct {
 }
 
 var defaultCategories = []string{
+	"Air Fare",
+	"Hotel",
 	"Food",
-	"Groceries",
-	"Travel",
-	"Rent",
-	"Utilities",
-	"Entertainment",
-	"Healthcare",
-	"Shopping",
-	"Miscellaneous",
-	"Income",
+	"Transit",
+	"Gordon",
+	"Angela",
+	"Evie",
+	"eSim",
 }
 
 var currencySymbols = map[string]string{
