@@ -169,8 +169,13 @@
                     // refresh category select and currency options
                     const categorySelect = document.getElementById('category');
                     categorySelect.innerHTML = cfg.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+                    // Set to last used category if available
                     const lastCat = localStorage.getItem('lastCategory');
-                    if (lastCat && cfg.categories.includes(lastCat)) categorySelect.value = lastCat;
+                    if (lastCat && cfg.categories.includes(lastCat)) {
+                        categorySelect.value = lastCat;
+                    } else if (cfg.categories.length > 0) {
+                        categorySelect.value = cfg.categories[0];
+                    }
                     populateCurrencySelect();
                     renderBudgetBars();
                 }).catch(err => console.error('Failed to auto-refresh config:', err));
@@ -483,6 +488,13 @@
                 categorySelect.innerHTML = cfg.categories.map(cat => 
                     `<option value="${cat}">${cat}</option>`
                 ).join('');
+                // Set to last used category if available
+                const lastCat = localStorage.getItem('lastCategory');
+                if (lastCat && cfg.categories.includes(lastCat)) {
+                    categorySelect.value = lastCat;
+                } else if (cfg.categories.length > 0) {
+                    categorySelect.value = cfg.categories[0];
+                }
                 currencySymbol = cfg.currency;
                 startDate = cfg.startDate;
                 // Populate currencies dropdown from configured exchange rates
