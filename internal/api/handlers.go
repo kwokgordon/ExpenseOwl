@@ -35,6 +35,7 @@ type ExpenseRequest struct {
 	Currency       string    `json:"currency,omitempty"`
 	CurrencyAmount float64   `json:"currencyAmount,omitempty"`
 	Date           time.Time `json:"date"`
+	Description    string    `json:"description,omitempty"`
 }
 
 type ConfigResponse struct {
@@ -231,14 +232,15 @@ func (h *Handler) AddExpense(w http.ResponseWriter, r *http.Request) {
 	} else {
 		computedAmount = req.Amount // could be 0
 	}
-	expense := &config.Expense{
-		Name:           req.Name,
-		Category:       req.Category,
-		Amount:         computedAmount,
-		Currency:       req.Currency,
-		CurrencyAmount: req.CurrencyAmount,
-		Date:           req.Date,
-	}
+	       expense := &config.Expense{
+		       Name:           req.Name,
+		       Category:       req.Category,
+		       Amount:         computedAmount,
+		       Currency:       req.Currency,
+		       CurrencyAmount: req.CurrencyAmount,
+		       Date:           req.Date,
+		       Description:    req.Description,
+	       }
 	if err := expense.Validate(); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		log.Printf("HTTP ERROR: Failed to validate expense: %v\n", err)
@@ -284,15 +286,16 @@ func (h *Handler) EditExpense(w http.ResponseWriter, r *http.Request) {
 		}
 		computedAmount = req.CurrencyAmount * rate
 	}
-	expense := &config.Expense{
-		ID:             id,
-		Name:           req.Name,
-		Category:       req.Category,
-		Amount:         computedAmount,
-		Currency:       req.Currency,
-		CurrencyAmount: req.CurrencyAmount,
-		Date:           req.Date,
-	}
+	       expense := &config.Expense{
+		       ID:             id,
+		       Name:           req.Name,
+		       Category:       req.Category,
+		       Amount:         computedAmount,
+		       Currency:       req.Currency,
+		       CurrencyAmount: req.CurrencyAmount,
+		       Date:           req.Date,
+		       Description:    req.Description,
+	       }
 	if err := expense.Validate(); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		log.Printf("HTTP ERROR: Failed to validate expense: %v\n", err)

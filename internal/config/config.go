@@ -52,9 +52,10 @@ type Expense struct {
 	Name           string    `json:"name"`
 	Category       string    `json:"category"`
 	Amount         float64   `json:"amount"`          // Amount in CAD (stored canonical)
-	Currency       string    `json:"currency,omitempty"`       // Currency code used when purchasing (e.g., JPY)
-	CurrencyAmount float64   `json:"currencyAmount,omitempty"` // Original amount in the transactional currency
+	Currency       string    `json:"currency"`       // Currency code used when purchasing (e.g., JPY)
+	CurrencyAmount float64   `json:"currencyAmount"` // Original amount in the transactional currency
 	Date           time.Time `json:"date"`
+	Description    string    `json:"description,omitempty"`
 }
 
 func (e *Expense) Validate() error {
@@ -63,6 +64,12 @@ func (e *Expense) Validate() error {
 	}
 	if e.Category == "" {
 		return errors.New("category is required")
+	}
+	if e.Currency == "" {
+		return errors.New("currency is required")
+	}
+	if e.CurrencyAmount <= 0 {
+		return errors.New("currency amount must be greater than 0")
 	}
 	if e.Amount <= 0 {
 		return errors.New("amount must be greater than 0")
