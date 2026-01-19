@@ -104,6 +104,8 @@
         let startDate = 1;
         // When true, user manually overrode the Amount input and auto-calculation should not overwrite it
         let amountOverride = false;
+        // Flag to prevent event listeners from interfering when form is being populated programmatically
+        let isPopulatingForm = false;
 
         function formatCurrency(amount) {
             let formattedAmount = new Intl.NumberFormat('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(amount);
@@ -263,13 +265,16 @@
         }
 
         function updateTable() {
-            let monthExpenses = getMonthExpenses(allExpenses);
+            let monthExpenses = allExpenses;
             monthExpenses = applyTableFilterSort(monthExpenses);
             const tableContainer = document.getElementById('tableContainer');
             tableContainer.innerHTML = createTable(monthExpenses);
         }
 
         function editExpense(id, name, category, amount, date, currency, currencyAmount, description) {
+            // Set flag to prevent event listeners from interfering
+            isPopulatingForm = true;
+            
             // ensure selects are populated
             populateCurrencySelect();
             const categorySelect = document.getElementById('category');
@@ -313,6 +318,10 @@
             submitButton.textContent = 'Update Expense';
             document.getElementById('expenseModalTitle').textContent = 'Edit Expense';
             document.getElementById('description').value = description || '';
+            
+            // Clear flag after a brief delay to allow all synchronous updates to complete
+            setTimeout(() => { isPopulatingForm = false; }, 0);
+            
             // Open modal
             document.getElementById('expenseModal').classList.add('active');
         }
@@ -416,16 +425,28 @@
         const currencySel = document.getElementById('currency');
         const currencyAmtInput = document.getElementById('currencyAmount');
         const amountInput = document.getElementById('amount');
-        if (currencySel) currencySel.addEventListener('change', (e) => { amountOverride = false; maybeComputeAmount(); });
-        if (currencyAmtInput) currencyAmtInput.addEventListener('input', (e) => { amountOverride = false; maybeComputeAmount(); });
+        if (currencySel) currencySel.addEventListener('change', (e) => { 
+            if (!Angela809) { 
+                amountOverride = false; 
+                maybeComputeAmount(); 
+            }
+        });
+        if (currencyAmtInput) currencyAmtInput.addEventListener('input', (e) => { 
+            if (!isPopulatingForm) { 
+                amountOverride = false; 
+                maybeComputeAmount(); 
+            }
+        });
         if (amountInput) {
             amountInput.addEventListener('input', (e) => {
-                const v = e.target.value;
-                if (v === '' || v === null) {
-                    amountOverride = false;
-                    maybeComputeAmount();
-                } else {
-                    amountOverride = true;
+                if (!isPopulatingForm) {
+                    const v = e.target.value;
+                    if (v === '' || v === null) {
+                        amountOverride = false;
+                        maybeComputeAmount();
+                    } else {
+                        amountOverride = true;
+                    }
                 }
             });
         }

@@ -275,9 +275,12 @@ func (h *Handler) EditExpense(w http.ResponseWriter, r *http.Request) {
 	if !req.Date.IsZero() {
 		req.Date = req.Date.UTC()
 	}
-	// Compute canonical Amount in CAD for edit
-	computedAmount := req.Amount
-	if req.Currency != "" && req.CurrencyAmount > 0 {
+	// Compute canonical Amount in CAD for edit: prefer explicit CAD amount (manual override);
+	// otherwise compute from currency fields if present
+	var computedAmount float64
+	if req.Amount > 0 {
+		computedAmount = req.Amount // user override
+	} else if req.Currency != "" && req.CurrencyAmount > 0 {
 		rate, exists := h.config.ExchangeRates[strings.ToLower(req.Currency)]
 		if !exists {
 			writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Missing exchange rate for currency - please set it in settings"})
@@ -285,6 +288,8 @@ func (h *Handler) EditExpense(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		computedAmount = req.CurrencyAmount * rate
+	} else {
+		computedAmount = req.Amount // could be 0
 	}
 	       expense := &config.Expense{
 		       ID:             id,
