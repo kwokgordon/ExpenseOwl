@@ -120,7 +120,9 @@ func (s *jsonStore) EditExpense(expense *config.Expense) error {
 	found := false
 	for i, exp := range data.Expenses {
 		if exp.ID == expense.ID {
-			expense.Date = exp.Date
+			if expense.Date.IsZero() {
+				expense.Date = exp.Date
+			}
 			data.Expenses[i] = expense
 			found = true
 			break

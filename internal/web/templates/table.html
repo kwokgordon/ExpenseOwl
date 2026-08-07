@@ -84,6 +84,10 @@
                     <input type="number" id="amount" step="0.01" min="0">
                     <div class="form-note">Automatically calculated from Currency unless you manually override</div>
                 </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <input type="text" id="description" placeholder="Optional description">
+                </div>
                 <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
                     <button type="button" class="modal-button" onclick="closeExpenseModal()">Cancel</button>
                     <button type="submit" class="modal-button nav-button" id="expenseSubmit">Add Expense</button>
@@ -100,6 +104,8 @@
         let startDate = 1;
         // When true, user manually overrode the Amount input and auto-calculation should not overwrite it
         let amountOverride = false;
+        // Flag to prevent event listeners from interfering when form is being populated programmatically
+        let isPopulatingForm = false;
 
         function formatCurrency(amount) {
             let formattedAmount = new Intl.NumberFormat('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(amount);
@@ -220,7 +226,7 @@
                                 <td>${expense.category}</td>
                                 <td class="amount">${expense.currency ? (expense.currencyAmount + ' ' + expense.currency.toUpperCase() + ' / ') : ''}${formatCurrency(expense.amount)}</td>
                                 <td>
-                                    <button class="delete-button" onclick="editExpense('${expense.id}', '${expense.name}', '${expense.category}', ${expense.amount}, '${expense.date}', '${expense.currency || ''}', ${expense.currencyAmount || 0})">
+                                    <button class="delete-button" onclick="editExpense('${expense.id}', '${expense.name}', '${expense.category}', ${expense.amount}, '${expense.date}', '${expense.currency || ''}', ${expense.currencyAmount || 0}, '${expense.description ? expense.description.replace(/'/g, "\\'") : ''}')">
                                         <i class="fa-solid fa-pen-to-square"></i>
                                     </button>
                                     <button class="delete-button" onclick="showDeleteModal('${expense.id}')">
@@ -259,13 +265,16 @@
         }
 
         function updateTable() {
-            let monthExpenses = getMonthExpenses(allExpenses);
+            let monthExpenses = allExpenses;
             monthExpenses = applyTableFilterSort(monthExpenses);
             const tableContainer = document.getElementById('tableContainer');
             tableContainer.innerHTML = createTable(monthExpenses);
         }
 
-        function editExpense(id, name, category, amount, date, currency, currencyAmount) {
+        function editExpense(id, name, category, amount, date, currency, currencyAmount, description) {
+            // Set flag to prevent event listeners from interfering
+            isPopulatingForm = true;
+            
             // ensure selects are populated
             populateCurrencySelect();
             const categorySelect = document.getElementById('category');
@@ -308,6 +317,11 @@
             const submitButton = document.getElementById('expenseSubmit');
             submitButton.textContent = 'Update Expense';
             document.getElementById('expenseModalTitle').textContent = 'Edit Expense';
+            document.getElementById('description').value = description || '';
+            
+            // Clear flag after a brief delay to allow all synchronous updates to complete
+            setTimeout(() => { isPopulatingForm = false; }, 0);
+            
             // Open modal
             document.getElementById('expenseModal').classList.add('active');
         }
@@ -411,16 +425,28 @@
         const currencySel = document.getElementById('currency');
         const currencyAmtInput = document.getElementById('currencyAmount');
         const amountInput = document.getElementById('amount');
-        if (currencySel) currencySel.addEventListener('change', (e) => { amountOverride = false; maybeComputeAmount(); });
-        if (currencyAmtInput) currencyAmtInput.addEventListener('input', (e) => { amountOverride = false; maybeComputeAmount(); });
+        if (currencySel) currencySel.addEventListener('change', (e) => { 
+            if (!Angela809) { 
+                amountOverride = false; 
+                maybeComputeAmount(); 
+            }
+        });
+        if (currencyAmtInput) currencyAmtInput.addEventListener('input', (e) => { 
+            if (!isPopulatingForm) { 
+                amountOverride = false; 
+                maybeComputeAmount(); 
+            }
+        });
         if (amountInput) {
             amountInput.addEventListener('input', (e) => {
-                const v = e.target.value;
-                if (v === '' || v === null) {
-                    amountOverride = false;
-                    maybeComputeAmount();
-                } else {
-                    amountOverride = true;
+                if (!isPopulatingForm) {
+                    const v = e.target.value;
+                    if (v === '' || v === null) {
+                        amountOverride = false;
+                        maybeComputeAmount();
+                    } else {
+                        amountOverride = true;
+                    }
                 }
             });
         }
@@ -517,7 +543,8 @@
                 amount: Math.round((parseFloat(document.getElementById('amount').value) || 0) * 100) / 100,
                 currency: document.getElementById('currency').value.trim().toLowerCase(),
                 currencyAmount: parseFloat(document.getElementById('currencyAmount').value) || 0,
-                date: getISODateWithLocalTime(document.getElementById('date').value)
+                date: getISODateWithLocalTime(document.getElementById('date').value),
+                description: document.getElementById('description').value
             };
             try {
                 const url = editId ? `/expense/edit?id=${editId}` : '/expense';
