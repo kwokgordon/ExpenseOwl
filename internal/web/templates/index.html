@@ -72,6 +72,10 @@
                     <div class="form-note">Automatically calculated from Currency unless you manually override</div>
                 </div>
 
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <input type="text" id="description" placeholder="Optional description">
+                </div>
                 <button type="submit" class="nav-button">Add Expense</button>
                 <div id="formMessage" class="form-message"></div>
             </form>
@@ -211,13 +215,13 @@
             return expenses.filter(exp => exp.category !== "Income").reduce((sum, exp) => sum + exp.amount, 0);
         }
 
-        // New: render budget bars for the current month and respect toggled categories
+        // New: render budget bars for all expenses and respect toggled categories
         function renderBudgetBars() {
             const container = document.getElementById('budgetBars');
             container.innerHTML = '';
 
-            // Use only current-month expenses for the dashboard visualization
-            const monthExpenses = getMonthExpenses(allExpenses)
+            // Use all expenses for the dashboard visualization
+            const monthExpenses = allExpenses
                 .filter(exp => exp.category !== 'Income' && !disabledCategories.has(exp.category));
 
             // Sum spent amounts across the filtered expenses
@@ -373,8 +377,8 @@
             const legendContainer = document.getElementById('customLegend');
             if (!legendContainer) return; // Legend removed from layout, skip updating it
             legendContainer.innerHTML = ''; // Clear previous legend
-            // Get unique categories from current month's expenses only
-            const monthExpenses = getMonthExpenses(allExpenses);
+            // Get unique categories from all expenses
+            const monthExpenses = allExpenses;
             const currentMonthCategories = [...new Set(monthExpenses
                 .filter(exp => exp.category !== "Income") // Exclude Income from legend
                 .map(exp => exp.category))];
@@ -444,8 +448,8 @@
 
         // Update both the budget bars and the legend (and pie chart if present)
         function updateChartAndLegend() {
-            // Use current-month data, respecting disabled categories
-            const monthExpenses = getMonthExpenses(allExpenses).filter(exp => !disabledCategories.has(exp.category));
+            // Use all data, respecting disabled categories
+            const monthExpenses = allExpenses.filter(exp => !disabledCategories.has(exp.category));
             const categoryData = calculateCategoryBreakdown(monthExpenses);
 
             // Ensure colors exist for configured categories
@@ -607,7 +611,8 @@
                 amount: parseFloat(document.getElementById('amount').value) || 0,
                 currency: document.getElementById('currency').value.trim().toLowerCase(),
                 currencyAmount: parseFloat(document.getElementById('currencyAmount').value) || 0,
-                date: getISODateWithLocalTime(document.getElementById('date').value)
+                date: getISODateWithLocalTime(document.getElementById('date').value),
+                description: document.getElementById('description').value
             };
             try {
                 // store last used currency and category on the device
